@@ -20,7 +20,7 @@ const processUpload = async (req, res) => {
 
       idDescripcioActivitat = (
         await db.promise().query(
-          'SELECT da.id FROM grup_activitat ga JOIN pla_usos.subgrup_activitat sa on ga.codi = sa.codi_grup_activitat JOIN pla_usos.descripcio_activitat da on sa.id = da.id_subgrup_activitat WHERE ga.codi = ? AND sa.codi = ? AND da.codi = ?',
+          'SELECT da.id FROM ecpu_grup_activitat ga JOIN ecpu_subgrup_activitat sa on ga.codi = sa.codi_grup_activitat JOIN ecpu_descripcio_activitat da on sa.id = da.id_subgrup_activitat WHERE ga.codi = ? AND sa.codi = ? AND da.codi = ?',
           [codiParts[0], codiParts[1], codiParts[2]]
         )
       )[0][0]?.id;
@@ -59,12 +59,12 @@ const processUpload = async (req, res) => {
 
             if (index == 2 || index == 9 || index == 11 || index == 12) {
               await db.promise().query(
-                'INSERT INTO zona_activitat_condicio (zona_id, descripcio_activitat_id, condicio_id, valor) VALUES (?, ?, ?, ?)',
+                'INSERT INTO ecpu_zona_activitat_condicio (zona_id, descripcio_activitat_id, condicio_id, valor) VALUES (?, ?, ?, ?)',
                 [zones[index], idDescripcioActivitat, condicioId, valor == "" ? null : valor]
               );
             } else {
               await db.promise().query(
-                'INSERT INTO area_activitat_condicio (area_id, descripcio_activitat_id, condicio_id, valor) VALUES (?, ?, ?, ?)',
+                'INSERT INTO ecpu_area_activitat_condicio (area_id, descripcio_activitat_id, condicio_id, valor) VALUES (?, ?, ?, ?)',
                 [arees[index], idDescripcioActivitat, condicioId, valor == "" ? null : valor]
               );
             }
