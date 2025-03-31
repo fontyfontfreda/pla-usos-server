@@ -43,6 +43,31 @@ const getZones = async (req, res) => {
   }
 };
 
+const createZona = async (req, res) => {
+  try {
+    const { zona } = req.body.zona; // Rebem la zona en format {codi_zona: 0, descripcio_zona: '', arees: []}
+
+    if (!zona) {
+      return res.status(400).send('Falten dades: zona');
+    }
+
+    // Executa la consulta per eliminar la zona
+    const [result] = await db.promise().query(
+      'INSERT INTO ecpu_zona (codi, descripcio) VALUES (?, ?)',
+      [zona.codi_zona, zona.descripcio_zona]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).send('No s\'ha pogut crear la zona');
+    }
+
+    res.status(200).send('Zona creada correctament');
+  } catch (error) {
+    console.error('❌ Error creant la zona:', error);
+    res.status(500).send('Error al crear la zona');
+  }
+};
+
 const deleteZona = async (req, res) => {
   try {
     const { codi_zona } = req.body; // Rebem el codi en format "1"
@@ -120,5 +145,5 @@ const deleteArea = async (req, res) => {
 
 
 module.exports = {
-  getZones, deleteArea, deleteZona
+  getZones, deleteArea, deleteZona, createZona
 };
