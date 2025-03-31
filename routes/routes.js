@@ -20,8 +20,8 @@ router.get('/zones', zonaController.getZones);
 router.post('/zones/zona', zonaController.createZona);
 router.post('/zones/area', zonaController.createArea);
 
-router.delete('/zones/area', zonaController.deleteArea);
 router.delete('/zones/zona', zonaController.deleteZona);
+router.delete('/zones/area', zonaController.deleteArea);
 
 
 

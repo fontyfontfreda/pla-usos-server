@@ -158,10 +158,20 @@ const deleteArea = async (req, res) => {
       return res.status(400).send('Els codis han de ser numèrics');
     }
 
+    // Consulta per obtenir l'id de la zona
+    const [rows] = await db.promise().query('SELECT z.id FROM ecpu_zona z WHERE z.codi = ?',
+      [zona]
+    );
+
+    // Si no hi ha resultats, retornem un error 404
+    if (rows.length === 0) {
+      return res.status(404).send('No s\'ha trobat la zona');
+    }     
+
     // Executa la consulta per eliminar l'àrea
     const [result] = await db.promise().query(
       'DELETE FROM ecpu_area_tractament WHERE codi = ? AND id_zona = ?',
-      [area, zona]
+      [area, rows[0].id]
     );
 
     if (result.affectedRows === 0) {
