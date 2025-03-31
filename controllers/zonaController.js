@@ -51,7 +51,7 @@ const createZona = async (req, res) => {
       return res.status(400).send('Falten dades: zona');
     }
 
-    // Executa la consulta per eliminar la zona
+    // Executa la consulta per inserir la zona
     const [result] = await db.promise().query(
       'INSERT INTO ecpu_zona (codi, descripcio) VALUES (?, ?)',
       [zona.codi_zona, zona.descripcio_zona]
@@ -65,6 +65,41 @@ const createZona = async (req, res) => {
   } catch (error) {
     console.error('❌ Error creant la zona:', error);
     res.status(500).send('Error al crear la zona');
+  }
+};
+
+const createArea = async (req, res) => {
+  try {
+    const { area } = req.body.area; // Rebem l'area' en format {codi_area: 0, descripcio_area: ''}
+
+    if (!area) {
+      return res.status(400).send('Falten dades: area');
+    }
+
+    // Consulta per obtenir totes les zones
+    const [rows] = await db.promise().query('SELECT z.id FROM ecpu_zona z WHERE z.codi = ?',
+      [+area.codi_area.split(".")[0]]
+    );
+    
+    // Si no hi ha resultats, retornem un error 404
+    if (rows.length === 0) {
+      return res.status(404).send('No s\'ha trobat la zona');
+    } 
+    
+    // Executa la consulta per inserir l'àrea
+    const [result] = await db.promise().query(
+      'INSERT INTO ecpu_area_tractament (id_zona, codi, descripcio) VALUES (?, ?, ?)',
+      [rows[0].id, +area.codi_area.split(".")[1], area.descripcio_area]
+    );
+    
+    if (result.affectedRows === 0) {
+      return res.status(404).send('No s\'ha pogut crear l\'àrea');
+    }
+    
+    res.status(200).send('Àrea creada correctament');
+  } catch (error) {
+    console.error('❌ Error creant l\'àrea:', error);
+    res.status(500).send('Error al crear l\'àrea');
   }
 };
 
@@ -94,7 +129,7 @@ const deleteZona = async (req, res) => {
   } catch (error) {
     console.error('❌ Error eliminant la zona:', error);
     if (error.errno == 1451)
-      res.status(500).send('No s\'ha pogut eliminar, hi han activitats amb condicions relacionades amb aquesta zona');
+      res.status(500).send('No s\'ha pogut eliminar, hi han activitats amb condicions o àrees relacionades amb aquesta zona');
     else
       res.status(500).send('Error en eliminar la zona');
   }
@@ -145,5 +180,5 @@ const deleteArea = async (req, res) => {
 
 
 module.exports = {
-  getZones, deleteArea, deleteZona, createZona
+  getZones, deleteArea, deleteZona, createZona, createArea
 };
