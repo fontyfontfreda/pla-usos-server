@@ -10,6 +10,7 @@ const upload = multer({ storage: storage });
 
 //ADRECES
 router.get('/adreces',  adrecaController.getAdreces);
+router.post('/uploadAdreces', upload.single('file'), adrecaController.uploadAdreces);
 
 //CONDICIONS
 router.post('/upload', upload.single('file'), condicioController.processUpload);
