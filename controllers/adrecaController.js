@@ -62,7 +62,7 @@ const uploadAdreces = async (req, res) => {
 const getAdreces = async (req, res) => {
   try {
     // Consulta per obtenir totes les adreces
-    const [rows] = await db.promise().query('SELECT * FROM ecpu_adreca');
+    const [rows] = await db.promise().query("SELECT DOMCOD, CONCAT(tc.descripcio, ' ', a.carrer, ' Núm. ', numero, IF(pis IS NOT NULL, ' Pis ', ''), IF(pis IS NOT NULL, pis, ''), IF(porta IS NOT NULL, ' Pta. ', ''), IF(porta IS NOT NULL, porta, '')) adreca, nucli_cod, codi_carrer, carrer, numero, bis, pis, porta, tipus_dom, tipus_loc, amplada_carrer, coord_x, coord_y, zona_id, area_tractament_id, tipus_carrer_id FROM ecpu_adreca a JOIN ecpu_tipus_carrer tc on a.tipus_carrer_id = tc.id");
 
     // Si no hi ha resultats, retornem un error 404
     if (rows.length === 0) {
