@@ -3,6 +3,7 @@ const multer = require('multer');
 const condicioController = require('../controllers/condicioController');
 const adrecaController = require('../controllers/adrecaController');
 const zonaController = require('../controllers/zonaController');
+const activitatController = require('../controllers/activitatController');
 
 const router = express.Router();
 const storage = multer.memoryStorage();
@@ -23,6 +24,9 @@ router.post('/zones/area', zonaController.createArea);
 
 router.delete('/zones/zona', zonaController.deleteZona);
 router.delete('/zones/area', zonaController.deleteArea);
+
+//ACTIVITATS
+router.get('/activitats/:domcod', activitatController.getActivitats);
 
 
 

@@ -62,7 +62,7 @@ const uploadAdreces = async (req, res) => {
 const getAdreces = async (req, res) => {
   try {
     // Consulta per obtenir totes les adreces
-    const [rows] = await db.promise().query("SELECT DOMCOD, CONCAT(tc.descripcio, ' ', a.carrer, ' Núm. ', numero, IF(pis IS NOT NULL, ' Pis ', ''), IF(pis IS NOT NULL, pis, ''), IF(porta IS NOT NULL, ' Pta. ', ''), IF(porta IS NOT NULL, porta, '')) adreca, nucli_cod, codi_carrer, carrer, numero, bis, pis, porta, tipus_dom, tipus_loc, amplada_carrer, coord_x, coord_y, zona_id, area_tractament_id, tipus_carrer_id FROM ecpu_adreca a JOIN ecpu_tipus_carrer tc on a.tipus_carrer_id = tc.id");
+    const [rows] = await db.promise().query("SELECT DOMCOD, CONCAT(tc.descripcio, ' ', a.carrer, ' Núm. ', numero, IF(pis IS NOT NULL, ' Pis ', ''), IF(pis IS NOT NULL, pis, ''), IF(porta IS NOT NULL, ' Pta. ', ''), IF(porta IS NOT NULL, porta, '')) adreca, nucli_cod, codi_carrer, carrer, numero, bis, pis, porta, tipus_dom, tipus_loc, amplada_carrer, coord_x, coord_y, zona_id, CONCAT('ZR-', z.codi) AS codi_zona, area_tractament_id, IF(at.codi IS NOT NULL, CONCAT('ATE ', z.codi, '.', at.codi), NULL) AS codi_area, tipus_carrer_id FROM ecpu_adreca a JOIN ecpu_tipus_carrer tc on a.tipus_carrer_id = tc.id JOIN pla_usos.ecpu_zona z on a.zona_id = z.id LEFT JOIN pla_usos.ecpu_area_tractament at on a.area_tractament_id = at.id");
 
     // Si no hi ha resultats, retornem un error 404
     if (rows.length === 0) {
