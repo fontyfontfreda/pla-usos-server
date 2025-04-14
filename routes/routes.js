@@ -27,6 +27,7 @@ router.delete('/zones/area', zonaController.deleteArea);
 
 //ACTIVITATS
 router.get('/activitats/:domcod', activitatController.getActivitats);
+router.post('/activitats/consulta', activitatController.consultaActivitat);
 
 
 
