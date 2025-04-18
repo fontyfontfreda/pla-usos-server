@@ -1,63 +1,85 @@
-const db = require('../models/db');
+const oracledb = require('oracledb');
+const db = require('../models/db'); // Connecta amb Oracle
 
 const getZones = async (req, res) => {
+  let connection;
   try {
-    // Consulta per obtenir totes les zones
-    const [rows] = await db.promise().query('SELECT z.codi AS codi_zona, z.descripcio AS descripcio_zona, (SELECT CONCAT(ez.codi, \'.\', ea.codi) FROM ecpu_area_tractament ea JOIN pla_usos.ecpu_zona ez on ez.id = ea.id_zona WHERE ea.id = a.id) as codi_area, a.descripcio AS descripcio_area FROM ecpu_zona z LEFT JOIN ecpu_area_tractament a on z.id = a.id_zona');
+    connection = await db();
 
-    // Si no hi ha resultats, retornem un error 404
-    if (rows.length === 0) {
+    const result = await connection.execute(`
+      SELECT 
+        z.CODI AS codi_zona,
+        z.DESCRIPCIO AS descripcio_zona,
+        (SELECT ez.CODI || '.' || ea.CODI 
+         FROM ECPU_AREA_TRACTAMENT ea 
+         JOIN ECPU_ZONA ez ON ez.ID = ea.ID_ZONA 
+         WHERE ea.ID = a.ID) AS codi_area,
+        a.DESCRIPCIO AS descripcio_area
+      FROM 
+        ECPU_ZONA z
+      LEFT JOIN 
+        ECPU_AREA_TRACTAMENT a ON z.ID = a.ID_ZONA
+      ORDER BY z.ID
+    `, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+
+    const rows = result.rows;
+
+    if (!rows || rows.length === 0) {
       return res.status(404).send('No s\'han trobat zones ni àrees');
     }
 
-    // Agrupar les dades per zona
-    const result = [];
+    const agrupat = [];
     rows.forEach(row => {
-      // Comprovar si la zona ja existeix al resultat
-      let zona = result.find(z => z.codi_zona === row.codi_zona);
+      let zona = agrupat.find(z => z.codi_zona === row.CODI_ZONA);
 
-      // Si no existeix, la creem
       if (!zona) {
         zona = {
-          codi_zona: row.codi_zona,
-          descripcio_zona: row.descripcio_zona,
+          codi_zona: row.CODI_ZONA,
+          descripcio_zona: row.DESCRIPCIO_ZONA,
           arees: []
         };
-        result.push(zona);
+        agrupat.push(zona);
       }
 
-      // Si hi ha àrea, afegim-la a la zona
-      if (row.codi_area && row.descripcio_area) {
+      if (row.CODI_AREA && row.DESCRIPCIO_AREA) {
         zona.arees.push({
-          codi_area: row.codi_area,
-          descripcio_area: row.descripcio_area
+          codi_area: row.CODI_AREA,
+          descripcio_area: row.DESCRIPCIO_AREA
         });
       }
     });
 
-    // Retornem les dades agrupades
-    res.status(200).json(result);
+    res.status(200).json(agrupat);
+
   } catch (error) {
-    console.error('❌ Error obtenint les zones/arees:', error);
-    res.status(500).send('❌ Error en obtenir les zones/arees');
+    console.error('❌ Error obtenint les zones/àrees:', error);
+    res.status(500).send('❌ Error en obtenir les zones/àrees');
+  } finally {
+    if (connection) await connection.close();
   }
 };
 
 const createZona = async (req, res) => {
+  let connection;
   try {
-    const { zona } = req.body.zona; // Rebem la zona en format {codi_zona: 0, descripcio_zona: '', arees: []}
+    const { zona } = req.body.zona;
 
     if (!zona) {
       return res.status(400).send('Falten dades: zona');
     }
 
-    // Executa la consulta per inserir la zona
-    const [result] = await db.promise().query(
-      'INSERT INTO ecpu_zona (codi, descripcio) VALUES (?, ?)',
-      [zona.codi_zona, zona.descripcio_zona]
+    connection = await db();
+
+    const result = await connection.execute(
+      `INSERT INTO ECPU_ZONA (CODI, DESCRIPCIO) VALUES (:codi, :descripcio)`,
+      {
+        codi: zona.codi_zona,
+        descripcio: zona.descripcio_zona
+      },
+      { autoCommit: true }
     );
 
-    if (result.affectedRows === 0) {
+    if (result.rowsAffected === 0) {
       return res.status(404).send('No s\'ha pogut crear la zona');
     }
 
@@ -65,47 +87,64 @@ const createZona = async (req, res) => {
   } catch (error) {
     console.error('❌ Error creant la zona:', error);
     res.status(500).send('Error al crear la zona');
+  } finally {
+    if (connection) await connection.close();
   }
 };
 
 const createArea = async (req, res) => {
+  let connection;
   try {
-    const { area } = req.body.area; // Rebem l'area' en format {codi_area: 0, descripcio_area: ''}
+    const { area } = req.body.area;
 
     if (!area) {
       return res.status(400).send('Falten dades: area');
     }
 
-    // Consulta per obtenir totes les zones
-    const [rows] = await db.promise().query('SELECT z.id FROM ecpu_zona z WHERE z.codi = ?',
-      [+area.codi_area.split(".")[0]]
+    connection = await db();
+
+    const zonaCodi = +area.codi_area.split(".")[0];
+    const areaCodi = +area.codi_area.split(".")[1];
+
+    const zonaResult = await connection.execute(
+      `SELECT id FROM ECPU_ZONA WHERE CODI = :codi`,
+      { codi: zonaCodi },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
-    
-    // Si no hi ha resultats, retornem un error 404
-    if (rows.length === 0) {
+
+    if (zonaResult.rows.length === 0) {
       return res.status(404).send('No s\'ha trobat la zona');
-    } 
-    
-    // Executa la consulta per inserir l'àrea
-    const [result] = await db.promise().query(
-      'INSERT INTO ecpu_area_tractament (id_zona, codi, descripcio) VALUES (?, ?, ?)',
-      [rows[0].id, +area.codi_area.split(".")[1], area.descripcio_area]
+    }
+
+    const zonaId = zonaResult.rows[0].ID;
+
+    const insertResult = await connection.execute(
+      `INSERT INTO ECPU_AREA_TRACTAMENT (ID_ZONA, CODI, DESCRIPCIO) VALUES (:id_zona, :codi, :descripcio)`,
+      {
+        id_zona: zonaId,
+        codi: areaCodi,
+        descripcio: area.descripcio_area
+      },
+      { autoCommit: true }
     );
-    
-    if (result.affectedRows === 0) {
+
+    if (insertResult.rowsAffected === 0) {
       return res.status(404).send('No s\'ha pogut crear l\'àrea');
     }
-    
+
     res.status(200).send('Àrea creada correctament');
   } catch (error) {
     console.error('❌ Error creant l\'àrea:', error);
     res.status(500).send('Error al crear l\'àrea');
+  } finally {
+    if (connection) await connection.close();
   }
 };
 
 const deleteZona = async (req, res) => {
+  let connection;
   try {
-    const { codi_zona } = req.body; // Rebem el codi en format "1"
+    const { codi_zona } = req.body;
 
     if (!codi_zona) {
       return res.status(400).send('Falten dades: codi_zona');
@@ -115,42 +154,46 @@ const deleteZona = async (req, res) => {
       return res.status(400).send('El codi ha de ser numèric');
     }
 
-    // Executa la consulta per eliminar la zona
-    const [result] = await db.promise().query(
-      'DELETE FROM ecpu_zona WHERE codi = ?',
-      [codi_zona]
+    connection = await db();
+
+    const result = await connection.execute(
+      `DELETE FROM ECPU_ZONA WHERE codi = :codi`,
+      { codi: codi_zona },
+      { autoCommit: true }
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).send('No s\'ha trobat zona especificada');
+    if (result.rowsAffected === 0) {
+      return res.status(404).send('No s\'ha trobat la zona especificada');
     }
 
     res.status(200).send('Zona eliminada correctament');
   } catch (error) {
     console.error('❌ Error eliminant la zona:', error);
-    if (error.errno == 1451)
+    if (error.errorNum === 2292) { // Oracle FK constraint violation
       res.status(500).send('No s\'ha pogut eliminar, hi han activitats amb condicions o àrees relacionades amb aquesta zona');
-    else
+    } else {
       res.status(500).send('Error en eliminar la zona');
+    }
+  } finally {
+    if (connection) await connection.close();
   }
 };
 
 const deleteArea = async (req, res) => {
+  let connection;
   try {
-    const { codi_area } = req.body; // Rebem el codi en format "1.5"
+    const { codi_area } = req.body;
 
     if (!codi_area || typeof codi_area !== 'string' || !codi_area.includes('.')) {
       return res.status(400).send('Format incorrecte. Ha de ser "codi_zona.codi_area"');
     }
 
-    // Separem el codi en codi_zona i codi_area
     const [codiZona, codiArea] = codi_area.split('.');
 
     if (!codiZona || !codiArea) {
       return res.status(400).send('Falten dades: codi_zona o codi_area');
     }
 
-    // Convertim a números per evitar errors a la base de dades
     const zona = parseInt(codiZona, 10);
     const area = parseInt(codiArea, 10);
 
@@ -158,37 +201,47 @@ const deleteArea = async (req, res) => {
       return res.status(400).send('Els codis han de ser numèrics');
     }
 
-    // Consulta per obtenir l'id de la zona
-    const [rows] = await db.promise().query('SELECT z.id FROM ecpu_zona z WHERE z.codi = ?',
-      [zona]
+    connection = await db();
+
+    const zonaResult = await connection.execute(
+      `SELECT ID FROM ECPU_ZONA WHERE CODI = :codi`,
+      { codi: zona },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
 
-    // Si no hi ha resultats, retornem un error 404
-    if (rows.length === 0) {
+    if (zonaResult.rows.length === 0) {
       return res.status(404).send('No s\'ha trobat la zona');
-    }     
+    }
 
-    // Executa la consulta per eliminar l'àrea
-    const [result] = await db.promise().query(
-      'DELETE FROM ecpu_area_tractament WHERE codi = ? AND id_zona = ?',
-      [area, rows[0].id]
+    const zonaId = zonaResult.rows[0].ID;
+
+    const deleteResult = await connection.execute(
+      `DELETE FROM ECPU_AREA_TRACTAMENT WHERE CODI = :codi AND ID_ZONA = :id_zona`,
+      { codi: area, id_zona: zonaId },
+      { autoCommit: true }
     );
 
-    if (result.affectedRows === 0) {
+    if (deleteResult.rowsAffected === 0) {
       return res.status(404).send('No s\'ha trobat l\'àrea o la zona especificada');
     }
 
     res.status(200).send('Àrea eliminada correctament');
   } catch (error) {
     console.error('❌ Error eliminant l\'àrea:', error);
-    if (error.errno == 1451)
+    if (error.errorNum === 2292) {
       res.status(500).send('No s\'ha pogut eliminar, hi han activitats amb condicions relacionades amb aquesta àrea');
-    else
+    } else {
       res.status(500).send('Error en eliminar l\'àrea');
+    }
+  } finally {
+    if (connection) await connection.close();
   }
 };
 
-
 module.exports = {
-  getZones, deleteArea, deleteZona, createZona, createArea
+  getZones,
+  createZona,
+  createArea,
+  deleteZona,
+  deleteArea
 };

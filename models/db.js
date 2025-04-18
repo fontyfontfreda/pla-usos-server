@@ -1,19 +1,20 @@
-const mysql = require('mysql2');
+const oracledb = require('oracledb');
 require('dotenv').config();
 
-const db = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASS,
-  database: process.env.DB_NAME
-});
+const connectDB = async () => {
+  try {
+    const connection = await oracledb.getConnection({
+      user: process.env.DB_USER,
+      password: process.env.DB_PASS,
+      connectString: `${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`
+    });    
 
-db.connect(err => {
-  if (err) {
-    console.error('Error connectant a la base de dades:', err);
-    return;
+    console.log('✅ Connexió a la base de dades establerta correctament');
+    return connection;
+  } catch (err) {
+    console.error('❌ Error establint la connexió amb la base de dades:', err);
+    throw err;  // Propaga l'error perquè es pugui gestionar més amunt
   }
-  console.log('📦 Connexió a MariaDB establerta');
-});
+};
 
-module.exports = db;
+module.exports = connectDB;

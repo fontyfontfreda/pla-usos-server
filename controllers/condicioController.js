@@ -1,7 +1,9 @@
-
 const db = require('../models/db');
+const oracledb = require('oracledb');
+const xlsx = require('xlsx');
 
 const processUpload = async (req, res) => {
+  let connection;
   try {
     if (!req.file) {
       return res.status(400).send('No s\'ha proporcionat cap fitxer');
@@ -11,6 +13,8 @@ const processUpload = async (req, res) => {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const data = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
+    connection = await db();
+
     for (const row of data) {
       if (!row || row.length < 4 || !row[0]) continue; 
 
@@ -18,12 +22,21 @@ const processUpload = async (req, res) => {
 
       let idDescripcioActivitat = null;
 
-      idDescripcioActivitat = (
-        await db.promise().query(
-          'SELECT da.id FROM ecpu_grup_activitat ga JOIN ecpu_subgrup_activitat sa on ga.codi = sa.codi_grup_activitat JOIN ecpu_descripcio_activitat da on sa.id = da.id_subgrup_activitat WHERE ga.codi = ? AND sa.codi = ? AND da.codi = ?',
-          [codiParts[0], codiParts[1], codiParts[2]]
-        )
-      )[0][0]?.id;
+      const result = await connection.execute(
+        `SELECT da.id 
+         FROM ecpu_grup_activitat ga
+         JOIN ecpu_subgrup_activitat sa ON ga.codi = sa.codi_grup_activitat
+         JOIN ecpu_descripcio_activitat da ON sa.id = da.id_subgrup_activitat
+         WHERE ga.codi = :grupCodi AND sa.codi = :subgrupCodi AND da.codi = :descripcioCodi`,
+        {
+          grupCodi: codiParts[0],
+          subgrupCodi: codiParts[1],
+          descripcioCodi: codiParts[2]
+        },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      );
+
+      idDescripcioActivitat = result.rows[0]?.ID;
 
       if (idDescripcioActivitat) {
         for (let index = 2; index <= 12; index++) {
@@ -58,14 +71,28 @@ const processUpload = async (req, res) => {
             };
 
             if (index == 2 || index == 9 || index == 11 || index == 12) {
-              await db.promise().query(
-                'INSERT INTO ecpu_zona_activitat_condicio (zona_id, descripcio_activitat_id, condicio_id, valor) VALUES (?, ?, ?, ?)',
-                [zones[index], idDescripcioActivitat, condicioId, valor == "" ? null : valor]
+              await connection.execute(
+                `INSERT INTO ecpu_zona_activitat_condicio (zona_id, descripcio_activitat_id, condicio_id, valor)
+                 VALUES (:zona_id, :descripcio_activitat_id, :condicio_id, :valor)`,
+                {
+                  zona_id: zones[index],
+                  descripcio_activitat_id: idDescripcioActivitat,
+                  condicio_id: condicioId,
+                  valor: valor || null
+                },
+                { autoCommit: true }
               );
             } else {
-              await db.promise().query(
-                'INSERT INTO ecpu_area_activitat_condicio (area_id, descripcio_activitat_id, condicio_id, valor) VALUES (?, ?, ?, ?)',
-                [arees[index], idDescripcioActivitat, condicioId, valor == "" ? null : valor]
+              await connection.execute(
+                `INSERT INTO ecpu_area_activitat_condicio (area_id, descripcio_activitat_id, condicio_id, valor)
+                 VALUES (:area_id, :descripcio_activitat_id, :condicio_id, :valor)`,
+                {
+                  area_id: arees[index],
+                  descripcio_activitat_id: idDescripcioActivitat,
+                  condicio_id: condicioId,
+                  valor: valor || null
+                },
+                { autoCommit: true }
               );
             }
           }
@@ -76,6 +103,8 @@ const processUpload = async (req, res) => {
   } catch (error) {
     console.error('❌ Error processant l\'Excel:', error);
     res.status(500).send('❌ Error en processar el fitxer');
+  } finally {
+    if (connection) await connection.close();
   }
 };
 
