@@ -62,7 +62,7 @@ const getZones = async (req, res) => {
 const createZona = async (req, res) => {
   let connection;
   try {
-    const { zona } = req.body.zona;
+    const zona  = req.body.zona;
 
     if (!zona) {
       return res.status(400).send('Falten dades: zona');
@@ -95,7 +95,7 @@ const createZona = async (req, res) => {
 const createArea = async (req, res) => {
   let connection;
   try {
-    const { area } = req.body.area;
+    const area  = req.body.area;
 
     if (!area) {
       return res.status(400).send('Falten dades: area');

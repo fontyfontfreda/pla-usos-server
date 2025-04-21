@@ -5,6 +5,7 @@ const adrecaController = require('../controllers/adrecaController');
 const zonaController = require('../controllers/zonaController');
 const activitatController = require('../controllers/activitatController');
 const authController = require('../controllers/authController');
+const usuariController = require('../controllers/usuariController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -35,6 +36,10 @@ router.delete('/zones/area', zonaController.deleteArea);
 
 //ACTIVITATS
 router.post('/activitats/consulta', activitatController.consultaActivitat);
+
+//USUARIS
+router.get('/usuaris', usuariController.getUsuaris);
+
 
 // Ruta protegida amb JWT
 router.get('/protected', (req, res) => {
