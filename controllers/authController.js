@@ -26,8 +26,7 @@ const login = async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, username: user.username },
-      process.env.JWT_SECRET_KEY,
-      { expiresIn: '1h' }
+      process.env.JWT_SECRET_KEY
     );
 
     res.json({ token });
@@ -53,5 +52,7 @@ const register = async (req, res) => {
   // Retornar l'usuari creat
   res.status(201).json({ message: 'Usuari creat amb èxit', user: newUser });
 };
+
+
 
 module.exports = { login, register };

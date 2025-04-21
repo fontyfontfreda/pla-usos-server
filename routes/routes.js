@@ -39,6 +39,8 @@ router.post('/activitats/consulta', activitatController.consultaActivitat);
 
 //USUARIS
 router.get('/usuaris', usuariController.getUsuaris);
+router.put('/usuaris/:usuari/contrasenya', usuariController.updateContrasenya);
+router.delete('/usuaris/:usuari', usuariController.deleteUsuari);
 
 
 // Ruta protegida amb JWT
