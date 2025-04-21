@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const routes = require('./routes/routes');
 const connectDB = require('./models/db');  // Importar la funció de connexió a la base de dades
-require('dotenv').config();
+require('dotenv').config();  // Carregar les variables d'entorn del fitxer .env
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -21,6 +21,6 @@ connectDB()  // Intentar establir la connexió abans d'iniciar el servidor
     console.error('❌ Error al connectar-se a la base de dades:', err);
     process.exit(1);  // Finalitzar l'aplicació si no es pot establir la connexió
   });
-  
+
 // Rutes de l'API
 app.use('/api', routes);
