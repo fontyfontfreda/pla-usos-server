@@ -1,6 +1,52 @@
 const db = require('../models/db');
 const oracledb = require('oracledb');
-oracledb.initOracleClient({ libDir: 'C:\\Users\\AIT\\Documents\\instantclient_21_13\\instantclient_23_7' });  // << ruta on has descomprimit
+
+const getAllActivitats = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+
+    const activitats = await connection.execute(
+      `SELECT 
+        g.descripcio AS "descricpio_grup", 
+        s.descripcio AS "descripcio_subgrup", 
+        a.descripcio AS "descripcio_activitat" 
+       FROM ecpu_descripcio_activitat a 
+       JOIN ecpu_subgrup_activitat s ON a.id_subgrup_activitat = s.id
+       JOIN ecpu_grup_activitat g ON s.codi_grup_activitat = g.codi`,
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    if (activitats.rows.length === 0) {
+      return res.status(404).send('No s\'ha trobat cap activitat');
+    }
+
+    // Construir estructura
+    const resultat = {};
+
+    activitats.rows.forEach(row => {
+      const { descricpio_grup, descripcio_subgrup, descripcio_activitat } = row;
+
+      if (!resultat[descricpio_grup]) {
+        resultat[descricpio_grup] = {};
+      }
+
+      if (!resultat[descricpio_grup][descripcio_subgrup]) {
+        resultat[descricpio_grup][descripcio_subgrup] = [];
+      }
+
+      resultat[descricpio_grup][descripcio_subgrup].push(descripcio_activitat);
+    });
+
+    res.status(200).json(resultat);
+  } catch (error) {
+    console.error('❌ Error obtenint les activitats:', error);
+    res.status(500).send('❌ Error en obtenir les activitats');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
 
 const getActivitats = async (req, res) => {
   let connection;
@@ -186,5 +232,6 @@ function generarPDF() {
 
 module.exports = {
   getActivitats,
-  consultaActivitat
+  consultaActivitat,
+  getAllActivitats
 };

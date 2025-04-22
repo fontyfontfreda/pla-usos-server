@@ -1,11 +1,13 @@
 const oracledb = require('oracledb');
-oracledb.initOracleClient({ libDir: 'C:\\Users\\AIT\\Documents\\instantclient_21_13\\instantclient_23_7' });  // << ruta on has descomprimit
-
 require('dotenv').config();
 
 // Inicialitza Oracle Client (Thick mode)
 try {
-  oracledb.initOracleClient({ libDir: 'C:\\Users\\AIT\\Documents\\instantclient_21_13\\instantclient_23_7' });  // <-- Canvia això per la teva ruta
+  const isOlot = process.env.IS_OLOT === 'true';
+  if (isOlot) 
+    oracledb.initOracleClient({ libDir: 'C:\\Users\\AIT\\Documents\\instantclient_21_13\\instantclient_23_7' });
+  else
+    oracledb.initOracleClient({ libDir: 'C:\\Users\\oracleadmin\\instantclient\\instantclient_23_7' });
 } catch (err) {
   console.error('❌ Error inicialitzant Oracle Client:', err);
 }
