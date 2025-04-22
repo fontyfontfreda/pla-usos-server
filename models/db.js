@@ -1,5 +1,14 @@
 const oracledb = require('oracledb');
+oracledb.initOracleClient({ libDir: 'C:\\Users\\AIT\\Documents\\instantclient_21_13\\instantclient_23_7' });  // << ruta on has descomprimit
+
 require('dotenv').config();
+
+// Inicialitza Oracle Client (Thick mode)
+try {
+  oracledb.initOracleClient({ libDir: 'C:\\Users\\AIT\\Documents\\instantclient_21_13\\instantclient_23_7' });  // <-- Canvia això per la teva ruta
+} catch (err) {
+  console.error('❌ Error inicialitzant Oracle Client:', err);
+}
 
 const connectDB = async () => {
   try {

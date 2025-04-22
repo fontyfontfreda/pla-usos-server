@@ -1,5 +1,6 @@
 const db = require('../models/db');
 const oracledb = require('oracledb');
+oracledb.initOracleClient({ libDir: 'C:\\Users\\AIT\\Documents\\instantclient_21_13\\instantclient_23_7' });  // << ruta on has descomprimit
 
 const getActivitats = async (req, res) => {
   let connection;
@@ -111,18 +112,36 @@ const consultaActivitat = async (req, res) => {
       // Mirar condicions
       switch (activitat.id_condicio) {
         case 1:
+          // NO APTE
           is_apte = false;
           break;
         case 2:
+          // APTE
           is_apte = true;
           break;
         case 3:
+          // APTE PRIORITARI
+          is_apte = true;
+          break;
+        case 4:
+          consultaBuffer(connection, activitat);
+          // distancia 50m
+          is_apte = true;
+          break;
+        case 5:
+          // distancia 100m
+          is_apte = true;
+          break;
+        case 6:
+          // densitat 50m
           is_apte = true;
           break;
         case 7:
+          // amplaria 6m
           is_apte = adreca.amplada_carrer >= activitat.valor_condicio;
           break;
         case 9:
+          // ubicacio parcel·la
           is_apte = adreca.pis == +1;
           break;
         default:
@@ -139,6 +158,27 @@ const consultaActivitat = async (req, res) => {
     if (connection) await connection.close();
   }
 };
+
+async function consultaBuffer(connection, activitat){
+  const result = await connection.execute(
+    `SELECT A.DESCRIPCIO FROM (SELECT * FROM (SELECT COORDGEOCODEPOINT, DOMCOD, ADRECA, ZONA, ATE FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT 
+    WHERE ZONA = (SELECT ZONA FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT WHERE DOMCOD = :domcod)) dom, (
+    SELECT GRUP, SUBGRUP, DESCRIPCIO, DOMCOD FROM AIT.DOVC_DOMI_DADES_ACTIVI_SIGMA WHERE ESTAT IN 
+    ('ACTIVA','DUBTOSA','EN OBRES','HISTORICA','INACTIVA AMB LLICENCIA','INCOMPLERTA','MUNICIPAL') AND TIPUS_DOMICILI = 'PRINCIPAL' 
+    AND (trim(GRUP) = :grup AND trim(SUBGRUP) = :subgrup)) act where act.DOMCOD= dom.DOMCOD) A, 
+    (SELECT COORDGEOCODEPOINT, ZONA, ATE FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT WHERE DOMCOD = :domcod) B 
+    WHERE SDO_WITHIN_DISTANCE ( B.COORDGEOCODEPOINT, A.COORDGEOCODEPOINT, 'distance=' || :diam || ' unit=meter') = 'TRUE'`,
+    {
+      domcod: activitat.DOMCOD,
+      grup: activitat.descripcio_grup,
+      subgrup: activitat.descripcio_subgrup,
+      diam: activitat.valor_condicio
+    },
+    { autoCommit: true }
+  );
+  console.log(result.rows.length);
+  
+}
 
 function generarPDF() {
   // Funció per generar PDF si és necessari

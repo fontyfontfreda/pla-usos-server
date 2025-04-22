@@ -1,4 +1,5 @@
 const oracledb = require('oracledb');
+oracledb.initOracleClient({ libDir: 'C:\\Users\\AIT\\Documents\\instantclient_21_13\\instantclient_23_7' });  // << ruta on has descomprimit
 const db = require('../models/db'); // Connecta amb Oracle
 
 const getZones = async (req, res) => {

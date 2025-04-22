@@ -18,6 +18,7 @@ router.post('/register', authController.register);
 router.get('/adreces', adrecaController.getAdreces);
 router.get('/zones', zonaController.getZones);
 router.get('/activitats/:domcod', activitatController.getActivitats);
+router.post('/activitats/consulta', activitatController.consultaActivitat);
 
 // Protegir totes les rutes amb JWT middleware (a excepció de les rutes de login i registre)
 router.use(authMiddleware.verifyToken);
@@ -35,7 +36,6 @@ router.delete('/zones/zona', zonaController.deleteZona);
 router.delete('/zones/area', zonaController.deleteArea);
 
 //ACTIVITATS
-router.post('/activitats/consulta', activitatController.consultaActivitat);
 
 //USUARIS
 router.get('/usuaris', usuariController.getUsuaris);

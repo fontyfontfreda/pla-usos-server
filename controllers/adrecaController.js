@@ -1,5 +1,6 @@
 const db = require('../models/db');
 const oracledb = require('oracledb');
+oracledb.initOracleClient({ libDir: 'C:\\Users\\AIT\\Documents\\instantclient_21_13\\instantclient_23_7' });  // << ruta on has descomprimit
 const xlsx = require('xlsx');
 
 const uploadAdreces = async (req, res) => {
