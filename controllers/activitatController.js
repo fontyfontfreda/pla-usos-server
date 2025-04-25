@@ -8,7 +8,7 @@ const getAllActivitats = async (req, res) => {
 
     const activitats = await connection.execute(
       `SELECT 
-        g.descripcio AS "descricpio_grup", 
+        g.descripcio AS "descripcio_grup", 
         s.descripcio AS "descripcio_subgrup", 
         a.descripcio AS "descripcio_activitat" 
        FROM ecpu_descripcio_activitat a 
@@ -22,23 +22,27 @@ const getAllActivitats = async (req, res) => {
       return res.status(404).send('No s\'ha trobat cap activitat');
     }
 
-    // Construir estructura
     const resultat = {};
 
     activitats.rows.forEach(row => {
-      const { descricpio_grup, descripcio_subgrup, descripcio_activitat } = row;
+      const { descripcio_grup, descripcio_subgrup, descripcio_activitat } = row;
 
-      if (!resultat[descricpio_grup]) {
-        resultat[descricpio_grup] = {};
+      // Si no existeix el grup, el creem
+      if (!resultat[descripcio_grup]) {
+        resultat[descripcio_grup] = {};
       }
 
-      if (!resultat[descricpio_grup][descripcio_subgrup]) {
-        resultat[descricpio_grup][descripcio_subgrup] = [];
+      // Si no existeix el subgrup dins el grup, el creem
+      if (!resultat[descripcio_grup][descripcio_subgrup]) {
+        resultat[descripcio_grup][descripcio_subgrup] = [];
       }
 
-      resultat[descricpio_grup][descripcio_subgrup].push(descripcio_activitat);
+      // Afegim l'activitat dins el subgrup
+      resultat[descripcio_grup][descripcio_subgrup].push(descripcio_activitat);
     });
 
+    console.log(JSON.stringify(resultat, null, 2));
+    
     res.status(200).json(resultat);
   } catch (error) {
     console.error('❌ Error obtenint les activitats:', error);
@@ -47,6 +51,7 @@ const getAllActivitats = async (req, res) => {
     if (connection) await connection.close();
   }
 };
+
 
 const getActivitats = async (req, res) => {
   let connection;
