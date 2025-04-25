@@ -1,5 +1,11 @@
 const db = require('../models/db');
 const oracledb = require('oracledb');
+const PDFDocument = require('pdfkit');
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const isOlot = process.env.IS_OLOT === 'true';
 
 const getAllActivitats = async (req, res) => {
   let connection;
@@ -42,7 +48,7 @@ const getAllActivitats = async (req, res) => {
     });
 
     console.log(JSON.stringify(resultat, null, 2));
-    
+
     res.status(200).json(resultat);
   } catch (error) {
     console.error('❌ Error obtenint les activitats:', error);
@@ -51,7 +57,6 @@ const getAllActivitats = async (req, res) => {
     if (connection) await connection.close();
   }
 };
-
 
 const getActivitats = async (req, res) => {
   let connection;
@@ -129,35 +134,8 @@ const consultaActivitat = async (req, res) => {
     const adreca = dades.adreca;
     const activitat = dades.activitat;
 
-    // Executa la consulta per inserir la cosulta a la base de dades
-    const result = await connection.execute(
-      `INSERT INTO ecpu_consulta (DNI_interessat, nom_interessat, actuacio_interessat, DOMCOD, grup_id, grup_descripcio, subgrup_id, subgrup_descripcio, activitat_id, condicio_id, valor_condicio, is_altres, descripcio_altres) 
-       VALUES (:DNI_interessat, :nom_interessat, :actuacio_interessat, :DOMCOD, :grup_id, :grup_descripcio, :subgrup_id, :subgrup_descripcio, :activitat_id, :condicio_id, :valor_condicio, :is_altres, :descripcio_altres)`,
-      {
-        DNI_interessat: usuari.dni,
-        nom_interessat: usuari.nom,
-        actuacio_interessat: usuari.actuaComA,
-        DOMCOD: adreca.DOMCOD,
-        grup_id: !activitat.is_altres ? activitat.codi_grup : null,
-        grup_descripcio: !activitat.is_altres ? activitat.descripcio_grup : null,
-        subgrup_id: !activitat.is_altres ? activitat.codi_subgrup : null,
-        subgrup_descripcio: !activitat.is_altres ? activitat.descripcio_subgrup : null,
-        activitat_id: !activitat.is_altres ? activitat.codi_descripcio_activitat : null,
-        condicio_id: !activitat.is_altres ? activitat.id_condicio : null,
-        valor_condicio: !activitat.is_altres ? activitat.valor_condicio : null,
-        is_altres: activitat.is_altres ? 1 : 0,
-        descripcio_altres: !activitat.is_altres ? null : activitat.descripcio_activitat
-      },
-      { autoCommit: true }
-    );
-
-    if (result.rowsAffected === 0) {
-      return res.status(404).send('No s\'ha pogut crear la consulta');
-    }
-
     if (activitat.is_altres) {
       // Enviar correu a consorci
-      
     } else {
       let is_apte;
       // Mirar condicions
@@ -175,20 +153,19 @@ const consultaActivitat = async (req, res) => {
           is_apte = true;
           break;
         case 4:
-          consultaBuffer(connection, activitat);
           // distancia 50m
-          is_apte = true;
+          is_apte = await consultaBuffer(connection, activitat);
           break;
         case 5:
           // distancia 100m
-          is_apte = true;
+          is_apte = await consultaBuffer(connection, activitat);
           break;
         case 6:
           // densitat 50m
-          is_apte = true;
+          is_apte = await consultaBuffer(connection, activitat);
           break;
         case 7:
-          // amplaria 6m
+          // amplaria carrer
           is_apte = adreca.amplada_carrer >= activitat.valor_condicio;
           break;
         case 9:
@@ -198,10 +175,43 @@ const consultaActivitat = async (req, res) => {
         default:
           break;
       }
-      generarPDF(is_apte);
-    }
 
-    res.status(200).send('Consulta creada correctament');
+      // Executa la consulta per inserir la cosulta a la base de dades
+      const result = await connection.execute(
+        `INSERT INTO ecpu_consulta (DNI_interessat, nom_interessat, actuacio_interessat, DOMCOD, grup_id, grup_descripcio, subgrup_id, subgrup_descripcio, activitat_id, condicio_id, valor_condicio, is_altres, descripcio_altres, is_valid, coord_x, coord_y) 
+     VALUES (:DNI_interessat, :nom_interessat, :actuacio_interessat, :DOMCOD, :grup_id, :grup_descripcio, :subgrup_id, :subgrup_descripcio, :activitat_id, :condicio_id, :valor_condicio, :is_altres, :descripcio_altres, :is_valid, :coord_x, :coord_y)`,
+        {
+          DNI_interessat: usuari.dni,
+          nom_interessat: usuari.nom,
+          actuacio_interessat: usuari.actuaComA,
+          DOMCOD: adreca.DOMCOD,
+          grup_id: !activitat.is_altres ? activitat.codi_grup : null,
+          grup_descripcio: !activitat.is_altres ? activitat.descripcio_grup : null,
+          subgrup_id: !activitat.is_altres ? activitat.codi_subgrup : null,
+          subgrup_descripcio: !activitat.is_altres ? activitat.descripcio_subgrup : null,
+          activitat_id: !activitat.is_altres ? activitat.codi_descripcio_activitat : null,
+          condicio_id: !activitat.is_altres ? activitat.id_condicio : null,
+          valor_condicio: !activitat.is_altres ? activitat.valor_condicio : null,
+          is_altres: activitat.is_altres ? 1 : 0,
+          descripcio_altres: !activitat.is_altres ? null : activitat.descripcio_activitat,
+          is_valid: is_apte ? '1' : '0',
+          coord_x: adreca.coord_x,
+          coord_y: adreca.coord_y
+        },
+        { autoCommit: true }
+      );
+
+      if (result.rowsAffected === 0) {
+        return res.status(404).send('No s\'ha pogut crear la consulta');
+      }
+
+      // Inserir vista.
+
+      // Aquí generem el PDF i l'enviem en la resposta HTTP
+      await generarPDF(is_apte, activitat, adreca, res);
+
+      // Un cop generat el PDF, retornem la resposta
+    }
   } catch (error) {
     console.error('❌ Error creant la consulta:', error);
     res.status(500).send('Error al crear la consulta');
@@ -210,29 +220,153 @@ const consultaActivitat = async (req, res) => {
   }
 };
 
-async function consultaBuffer(connection, activitat){
-  const result = await connection.execute(
-    `SELECT A.DESCRIPCIO FROM (SELECT * FROM (SELECT COORDGEOCODEPOINT, DOMCOD, ADRECA, ZONA, ATE FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT 
-    WHERE ZONA = (SELECT ZONA FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT WHERE DOMCOD = :domcod)) dom, (
-    SELECT GRUP, SUBGRUP, DESCRIPCIO, DOMCOD FROM AIT.DOVC_DOMI_DADES_ACTIVI_SIGMA WHERE ESTAT IN 
-    ('ACTIVA','DUBTOSA','EN OBRES','HISTORICA','INACTIVA AMB LLICENCIA','INCOMPLERTA','MUNICIPAL') AND TIPUS_DOMICILI = 'PRINCIPAL' 
-    AND (trim(GRUP) = :grup AND trim(SUBGRUP) = :subgrup)) act where act.DOMCOD= dom.DOMCOD) A, 
-    (SELECT COORDGEOCODEPOINT, ZONA, ATE FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT WHERE DOMCOD = :domcod) B 
-    WHERE SDO_WITHIN_DISTANCE ( B.COORDGEOCODEPOINT, A.COORDGEOCODEPOINT, 'distance=' || :diam || ' unit=meter') = 'TRUE'`,
-    {
-      domcod: activitat.DOMCOD,
-      grup: activitat.descripcio_grup,
-      subgrup: activitat.descripcio_subgrup,
-      diam: activitat.valor_condicio
-    },
-    { autoCommit: true }
-  );
-  console.log(result.rows.length);
-  
+function generarPDF(is_apte, activitat, adreca, res) {
+  return new Promise(async (resolve, reject) => {
+    let mapaUrl = '';
+
+    if (activitat.id_condicio == 4 || activitat.id_condicio == 5 || activitat.id_condicio == 6 || activitat.id_condicio == 7)
+      mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos_informe.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}`;
+    else
+      mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}`;
+
+    try {
+      // Llançar navegador i capturar la pàgina
+      const browser = await puppeteer.launch();
+      const page = await browser.newPage();
+      await page.goto(mapaUrl, { waitUntil: 'networkidle0' });
+
+      // Captura de la pàgina (o part visible)
+      const screenshotPath = path.join(os.tmpdir(), 'mapa_temp.png');
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+
+      await browser.close();
+
+      // Crear un nou document PDF
+      const doc = new PDFDocument();
+
+      // Configura el tipus de contingut i el nom del fitxer PDF
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline; filename="informe_final.pdf"');
+
+      // El fitxer PDF es genera directament en la resposta
+      doc.pipe(res);
+
+      // Contingut del PDF
+      doc.font('Helvetica-Bold')
+        .fontSize(12)
+        .text('INFORME FINAL INFORMATIU', { align: 'left' });
+      doc.moveDown();
+
+      // Data
+      const avui = new Date();
+      const dataFormatejada = `${String(avui.getDate()).padStart(2, '0')}/${String(avui.getMonth() + 1).padStart(2, '0')}/${avui.getFullYear()}`;
+
+      doc.font('Helvetica')
+        .fontSize(10)
+        .text(`DATA: ${dataFormatejada}`, { align: 'left' });
+      doc.moveDown();
+
+      // Adreça i activitat
+      doc.text(`- ${adreca.adreca} (${adreca.DOMCOD}) OLOT`);
+      doc.moveDown();
+      doc.text(`- Tipus d'activitat: ${activitat.descripcio_grup}`);
+      doc.text(`- Sector: ${activitat.descripcio_subgrup}`);
+      doc.text(`- Desglòs: ${activitat.descripcio_descripcio_activitat}`);
+      doc.moveDown();
+
+      // Mapa
+      doc.image(screenshotPath, {
+        fit: [500, 300],
+        align: 'center',
+        valign: 'center'
+      });
+      doc.moveDown(2);
+
+      // Informació
+      doc.font('Helvetica-Bold')
+        .fontSize(12)
+        .text(titolInformacioPDF(is_apte, activitat.id_condicio), { align: 'center' });
+      doc.moveDown(2);
+      doc.font('Helvetica')
+        .fontSize(10)
+        .text(``, { align: 'left' });
+
+      // Paràgraf 1
+      if (activitat.id_condicio != 1 && activitat.id_condicio != 2 && activitat.id_condicio != 3 && is_apte) {
+        doc.font('Helvetica')
+          .fontSize(10)
+          .fillColor('red')
+          .text('ALERTA: ', { continued: true })  // continua a la mateixa línia
+
+        doc.fillColor('black')
+          .text('aquesta activitat està admesa amb condicions i, per tant, hauràs de dirigir-te al Consorci de Medi Ambient i Salut Pública (SIGMA) per tal que et verifiquin que l’activitat és apte en aquest establiment.', {
+            align: 'left'
+          });
+
+        doc.moveDown();
+      }
+
+      // Paràgraf 2
+      if (activitat.id_condicio != 1 && is_apte) {
+        if (activitat.id_condicio == 2 || activitat.id_condicio == 3)
+          doc.text('Aquest document s’ha d’entregar al SIGMA (Consorci de Medi Ambient i Salut Pública) i té una vigència d’un mes.', { align: 'left' });
+        else
+          doc.text('Aquest document té una vigència d’un mes.', { align: 'left' });
+        doc.moveDown();
+      }
+
+      // Paràgraf 3
+      doc.text('Document sense valor normatiu, vàlid només a efectes informatius.', { align: 'left' });
+
+      doc.end();
+
+      doc.on('finish', () => {
+        resolve();
+      });
+
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
-function generarPDF() {
-  // Funció per generar PDF si és necessari
+function titolInformacioPDF(is_apte, condicio) {
+  if (!is_apte) {
+    return 'ACTIVITAT NO ADMESA SEGONS EL PLA ESPECIAL D’USOS';
+  } else if (condicio == 2 || condicio == 3) {
+    return 'ACTIVITAT ADMESA SEGONS EL PLA ESPECIAL D’USOS';
+  } else {
+    return 'ACTIVITAT ADMESA AMB CONDICIONS SEGONS EL PLA ESPECIAL D’USOS';
+  }
+}
+
+async function consultaBuffer(connection, activitat) {
+  if (isOlot) {
+    const result = await connection.execute(
+      `SELECT A.DESCRIPCIO FROM (SELECT * FROM (SELECT COORDGEOCODEPOINT, DOMCOD, ADRECA, ZONA, ATE FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT 
+      WHERE ZONA = (SELECT ZONA FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT WHERE DOMCOD = :domcod)) dom, (
+      SELECT GRUP, SUBGRUP, DESCRIPCIO, DOMCOD FROM AIT.DOVC_DOMI_DADES_ACTIVI_SIGMA WHERE ESTAT IN 
+      ('ACTIVA','DUBTOSA','EN OBRES','HISTORICA','INACTIVA AMB LLICENCIA','INCOMPLERTA','MUNICIPAL') AND TIPUS_DOMICILI = 'PRINCIPAL' 
+      AND (trim(GRUP) = :grup AND trim(SUBGRUP) = :subgrup)) act where act.DOMCOD= dom.DOMCOD) A, 
+      (SELECT COORDGEOCODEPOINT, ZONA, ATE FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT WHERE DOMCOD = :domcod) B 
+      WHERE SDO_WITHIN_DISTANCE ( B.COORDGEOCODEPOINT, A.COORDGEOCODEPOINT, 'distance=' || :diam || ' unit=meter') = 'TRUE'`,
+      {
+        domcod: activitat.DOMCOD,
+        grup: activitat.descripcio_grup,
+        subgrup: activitat.descripcio_subgrup,
+        diam: activitat.valor_condicio
+      },
+      { autoCommit: true }
+    );
+    if ((activitat.id_condicio == 4 || activitat.id_condicio == 5) && result.rows.length == 0) {
+      return true;
+    }
+    if (activitat.id_condicio == 6 && result.rows.length < activitat.valor_condicio) {
+      return true;
+    }
+    return false;
+  } else
+    return false;
 }
 
 module.exports = {
