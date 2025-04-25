@@ -58,6 +58,55 @@ const getAllActivitats = async (req, res) => {
   }
 };
 
+const pdfConsulta = async (req, res) => {
+  let connection;
+  try {
+    const { consultaId } = req.params;
+
+    connection = await db();
+    const result = await connection.execute(
+      `SELECT c.CONDICIO_ID, c.GRUP_DESCRIPCIO, c.SUBGRUP_DESCRIPCIO, d.descripcio AS "ACTIVITAT_DESCRIPCIO", c.COORD_X, c.COORD_Y, tc.descripcio || ' ' || a.carrer || ' Núm. ' || a.numero || 
+        CASE WHEN a.pis IS NOT NULL THEN ' Pis ' || a.pis ELSE '' END || 
+        CASE WHEN a.porta IS NOT NULL THEN ' Pta. ' || a.porta ELSE '' END AS "adreca"
+        FROM ECPU_CONSULTA c
+        JOIN ecpu_descripcio_activitat d ON d.id = c.activitat_id
+        JOIN ecpu_adreca a ON a.DOMCOD = c.DOMCOD
+        JOIN ecpu_tipus_carrer tc ON a.tipus_carrer_id = tc.id 
+        WHERE c.ID = :id`,
+      [consultaId],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).send('Consulta no trobada');
+    }
+
+    const fila = result.rows[0];
+
+    const activitat = {
+      id_condicio: fila.CONDICIO_ID,
+      descripcio_grup: fila.GRUP_DESCRIPCIO,
+      descripcio_subgrup: fila.SUBGRUP_DESCRIPCIO,
+      descripcio_descripcio_activitat: fila.ACTIVITAT_DESCRIPCIO
+    }
+
+    const adreca = {
+      coord_x: fila.COORD_X,
+      coord_y: fila.COORD_Y,
+      adreca: fila.adreca
+    }
+
+    // Aquí generem el PDF i l’enviem
+    await generarPDF(fila.IS_VALID, activitat, adreca, res);
+
+  } catch (error) {
+    console.error('❌ Error creant la consulta:', error);
+    res.status(500).send('Error al crear la consulta');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
 const getActivitats = async (req, res) => {
   let connection;
   try {
@@ -372,5 +421,6 @@ async function consultaBuffer(connection, activitat) {
 module.exports = {
   getActivitats,
   consultaActivitat,
-  getAllActivitats
+  getAllActivitats,
+  pdfConsulta
 };

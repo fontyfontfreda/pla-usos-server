@@ -50,6 +50,7 @@ router.delete('/usuaris/:usuari', usuariController.deleteUsuari);
 
 //CONSULTES
 router.get('/consultes', consultaController.getConsultes);
+router.get('/consultes/generarPDF/:consultaId', activitatController.pdfConsulta);
 
 // Ruta protegida amb JWT
 router.get('/protected', (req, res) => {
