@@ -26,7 +26,6 @@ router.get('/zones', zonaController.getZones);
 //ACTIVITATS
 router.get('/activitats/:domcod', activitatController.getActivitats);
 router.post('/activitats/consulta', activitatController.consultaActivitat);
-router.get('/activitats', activitatController.getAllActivitats);
 
 // Protegir totes les rutes amb JWT middleware (a excepció de les rutes de login i registre)
 router.use(authMiddleware.verifyToken);
@@ -51,6 +50,9 @@ router.delete('/usuaris/:usuari', usuariController.deleteUsuari);
 //CONSULTES
 router.get('/consultes', consultaController.getConsultes);
 router.get('/consultes/generarPDF/:consultaId', activitatController.pdfConsulta);
+
+//ACTIVITATS
+router.get('/activitats', activitatController.getAllActivitats);
 
 // Ruta protegida amb JWT
 router.get('/protected', (req, res) => {
