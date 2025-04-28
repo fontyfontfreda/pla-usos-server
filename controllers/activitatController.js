@@ -47,8 +47,6 @@ const getAllActivitats = async (req, res) => {
       resultat[descripcio_grup][descripcio_subgrup].push(descripcio_activitat);
     });
 
-    console.log(JSON.stringify(resultat, null, 2));
-
     res.status(200).json(resultat);
   } catch (error) {
     console.error('❌ Error obtenint les activitats:', error);
@@ -65,9 +63,9 @@ const pdfConsulta = async (req, res) => {
 
     connection = await db();
     const result = await connection.execute(
-      `SELECT c.CONDICIO_ID, c.GRUP_DESCRIPCIO, c.SUBGRUP_DESCRIPCIO, d.descripcio AS "ACTIVITAT_DESCRIPCIO", c.COORD_X, c.COORD_Y, tc.descripcio || ' ' || a.carrer || ' Núm. ' || a.numero || 
+      `SELECT c.CONDICIO_ID, c.VALOR_CONDICIO, c.DOMCOD, c.GRUP_DESCRIPCIO, c.SUBGRUP_DESCRIPCIO, d.descripcio AS "ACTIVITAT_DESCRIPCIO", c.COORD_X, c.COORD_Y, tc.descripcio || ' ' || a.carrer || ' Núm. ' || a.numero || 
         CASE WHEN a.pis IS NOT NULL THEN ' Pis ' || a.pis ELSE '' END || 
-        CASE WHEN a.porta IS NOT NULL THEN ' Pta. ' || a.porta ELSE '' END AS "adreca"
+        CASE WHEN a.porta IS NOT NULL THEN ' Pta. ' || a.porta ELSE '' END AS "adreca", a.AMPLADA_CARRER, a.PIS
         FROM ECPU_CONSULTA c
         JOIN ecpu_descripcio_activitat d ON d.id = c.activitat_id
         JOIN ecpu_adreca a ON a.DOMCOD = c.DOMCOD
@@ -85,19 +83,24 @@ const pdfConsulta = async (req, res) => {
 
     const activitat = {
       id_condicio: fila.CONDICIO_ID,
+      valor_condicio: fila.VALOR_CONDICIO,
+      DOMCOD: fila.DOMCOD,
       descripcio_grup: fila.GRUP_DESCRIPCIO,
       descripcio_subgrup: fila.SUBGRUP_DESCRIPCIO,
       descripcio_descripcio_activitat: fila.ACTIVITAT_DESCRIPCIO
     }
 
     const adreca = {
+      DOMCOD: fila.DOMCOD,
       coord_x: fila.COORD_X,
       coord_y: fila.COORD_Y,
-      adreca: fila.adreca
+      adreca: fila.adreca,
+      aplada_carrer: fila.AMPLADA_CARRER,
+      pis: fila.PIS
     }
 
     // Aquí generem el PDF i l’enviem
-    await generarPDF(fila.IS_VALID, activitat, adreca, res);
+    await generarPDF(isConsultaValida(activitat, connection, adreca), activitat, adreca, res);
 
   } catch (error) {
     console.error('❌ Error creant la consulta:', error);
@@ -186,44 +189,7 @@ const consultaActivitat = async (req, res) => {
     if (activitat.is_altres) {
       // Enviar correu a consorci
     } else {
-      let is_apte;
-      // Mirar condicions
-      switch (activitat.id_condicio) {
-        case 1:
-          // NO APTE
-          is_apte = false;
-          break;
-        case 2:
-          // APTE
-          is_apte = true;
-          break;
-        case 3:
-          // APTE PRIORITARI
-          is_apte = true;
-          break;
-        case 4:
-          // distancia 50m
-          is_apte = await consultaBuffer(connection, activitat);
-          break;
-        case 5:
-          // distancia 100m
-          is_apte = await consultaBuffer(connection, activitat);
-          break;
-        case 6:
-          // densitat 50m
-          is_apte = await consultaBuffer(connection, activitat);
-          break;
-        case 7:
-          // amplaria carrer
-          is_apte = adreca.amplada_carrer >= activitat.valor_condicio;
-          break;
-        case 9:
-          // ubicacio parcel·la
-          is_apte = adreca.pis == +1;
-          break;
-        default:
-          break;
-      }
+      let is_apte = await isConsultaValida(activitat, connection, adreca);
 
       // Executa la consulta per inserir la cosulta a la base de dades
       const result = await connection.execute(
@@ -268,6 +234,48 @@ const consultaActivitat = async (req, res) => {
     if (connection) await connection.close();
   }
 };
+
+async function isConsultaValida(activitat, connection, adreca) {
+  let is_apte = false;
+  // Mirar condicions
+  switch (activitat.id_condicio) {
+    case 1:
+      // NO APTE
+      is_apte = false;
+      break;
+    case 2:
+      // APTE
+      is_apte = true;
+      break;
+    case 3:
+      // APTE PRIORITARI
+      is_apte = true;
+      break;
+    case 4:
+      // distancia 50m
+      is_apte = await consultaBuffer(connection, activitat);
+      break;
+    case 5:
+      // distancia 100m
+      is_apte = await consultaBuffer(connection, activitat);
+      break;
+    case 6:
+      // densitat 50m
+      is_apte = await consultaBuffer(connection, activitat);
+      break;
+    case 7:
+      // amplaria carrer
+      is_apte = adreca.amplada_carrer >= activitat.valor_condicio;
+      break;
+    case 9:
+      // ubicacio parcel·la
+      is_apte = adreca.pis == +1;
+      break;
+    default:
+      break;
+  }
+  return is_apte;
+}
 
 function generarPDF(is_apte, activitat, adreca, res) {
   return new Promise(async (resolve, reject) => {
