@@ -192,9 +192,10 @@ const consultaActivitat = async (req, res) => {
       let is_apte = await isConsultaValida(activitat, connection, adreca);
 
       // Executa la consulta per inserir la cosulta a la base de dades
+      let insertedId;
       const result = await connection.execute(
         `INSERT INTO ecpu_consulta (DNI_interessat, nom_interessat, actuacio_interessat, DOMCOD, grup_id, grup_descripcio, subgrup_id, subgrup_descripcio, activitat_id, condicio_id, valor_condicio, is_altres, descripcio_altres, is_valid, coord_x, coord_y) 
-     VALUES (:DNI_interessat, :nom_interessat, :actuacio_interessat, :DOMCOD, :grup_id, :grup_descripcio, :subgrup_id, :subgrup_descripcio, :activitat_id, :condicio_id, :valor_condicio, :is_altres, :descripcio_altres, :is_valid, :coord_x, :coord_y)`,
+     VALUES (:DNI_interessat, :nom_interessat, :actuacio_interessat, :DOMCOD, :grup_id, :grup_descripcio, :subgrup_id, :subgrup_descripcio, :activitat_id, :condicio_id, :valor_condicio, :is_altres, :descripcio_altres, :is_valid, :coord_x, :coord_y) RETURNING id INTO :insertedId`,
         {
           DNI_interessat: usuari.dni,
           nom_interessat: usuari.nom,
@@ -211,7 +212,8 @@ const consultaActivitat = async (req, res) => {
           descripcio_altres: !activitat.is_altres ? null : activitat.descripcio_activitat,
           is_valid: is_apte ? '1' : '0',
           coord_x: adreca.coord_x,
-          coord_y: adreca.coord_y
+          coord_y: adreca.coord_y,
+          insertedId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
         },
         { autoCommit: true }
       );
@@ -220,7 +222,10 @@ const consultaActivitat = async (req, res) => {
         return res.status(404).send('No s\'ha pogut crear la consulta');
       }
 
+      insertedId = result.outBinds.insertedId[0];
+
       // Inserir vista.
+      await inserirVista(connection, adreca.coord_x, adreca.coord_y, insertedId);
 
       // Aquí generem el PDF i l'enviem en la resposta HTTP
       await generarPDF(is_apte, activitat, adreca, res);
@@ -253,15 +258,15 @@ async function isConsultaValida(activitat, connection, adreca) {
       break;
     case 4:
       // distancia 50m
-      is_apte = await consultaBuffer(connection, activitat);
+      is_apte = await consultaBuffer(connection, activitat, adreca.DOMCOD);
       break;
     case 5:
       // distancia 100m
-      is_apte = await consultaBuffer(connection, activitat);
+      is_apte = await consultaBuffer(connection, activitat, adreca.DOMCOD);
       break;
     case 6:
       // densitat 50m
-      is_apte = await consultaBuffer(connection, activitat);
+      is_apte = await consultaBuffer(connection, activitat, adreca.DOMCOD);
       break;
     case 7:
       // amplaria carrer
@@ -277,12 +282,50 @@ async function isConsultaValida(activitat, connection, adreca) {
   return is_apte;
 }
 
+async function inserirVista(connection, coord_x, coord_y, consulta_id) {
+  // Validació: assegura que coord_x i coord_y són números
+  if (isNaN(coord_x) || isNaN(coord_y)) {
+    throw new Error(`Coordenades no vàlides: coord_x = ${coord_x}, coord_y = ${coord_y}`);
+  }
+
+  // També pots assegurar que consulta_id és numèric si no tens garanties
+  if (isNaN(consulta_id)) {
+    throw new Error(`ID de consulta no vàlid: consulta_id = ${consulta_id}`);
+  }
+
+  const sql = `
+    CREATE OR REPLACE VIEW AIT.ECPU_DADES_VISTA_PLANOL AS
+    SELECT cons.ID,
+      sdo_geometry('POINT (${coord_x} ${coord_y})', 25831) AS GEOMETRY,
+      ROUND(COORD_X, 0) AS X,
+      ROUND(COORD_Y, 0) AS Y,
+      cons.DOMCOD,
+      GRUP_ID,
+      GRUP_DESCRIPCIO,
+      SUBGRUP_DESCRIPCIO,
+      CONDICIO_ID,
+      VALOR_CONDICIO,
+      IS_ALTRES,
+      DESCRIPCIO_ALTRES,
+      (CASE WHEN CONDICIO_ID IN (4,5,6) THEN 'BUFFER' WHEN CONDICIO_ID = 7 THEN 'TRAM' ELSE 'NO' END) TIPUS,
+      (CASE WHEN IS_VALID = 1 THEN 'SI' ELSE 'NO' END) VALID,
+      ZONA,
+      ATE
+    FROM AIT.ECPU_CONSULTA cons,
+         AIT.USTG_LOC_DETALL_IN_P_USOS_AUT loc
+    WHERE cons.ID = ${consulta_id}
+      AND cons.DOMCOD = loc.DOMCOD
+  `;
+
+  await connection.execute(sql, [], { autoCommit: true });
+}
+
 function generarPDF(is_apte, activitat, adreca, res) {
   return new Promise(async (resolve, reject) => {
     let mapaUrl = '';
 
     if (activitat.id_condicio == 4 || activitat.id_condicio == 5 || activitat.id_condicio == 6 || activitat.id_condicio == 7)
-      mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos_informe.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}`;
+      mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos_informe.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}&diam=${activitat.valor_condicio}`;
     else
       mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}`;
 
@@ -291,6 +334,9 @@ function generarPDF(is_apte, activitat, adreca, res) {
       const browser = await puppeteer.launch();
       const page = await browser.newPage();
       await page.goto(mapaUrl, { waitUntil: 'networkidle0' });
+
+      // Esperar 1 segon addicional (pots ajustar el temps si cal)
+      await new Promise(resolve => setTimeout(resolve, 5000));
 
       // Captura de la pàgina (o part visible)
       const screenshotPath = path.join(os.tmpdir(), 'mapa_temp.png');
@@ -397,7 +443,7 @@ function titolInformacioPDF(is_apte, condicio) {
   }
 }
 
-async function consultaBuffer(connection, activitat) {
+async function consultaBuffer(connection, activitat, DOMCOD) {
   if (isOlot) {
     const result = await connection.execute(
       `SELECT A.DESCRIPCIO FROM (SELECT * FROM (SELECT COORDGEOCODEPOINT, DOMCOD, ADRECA, ZONA, ATE FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT 
@@ -408,13 +454,14 @@ async function consultaBuffer(connection, activitat) {
       (SELECT COORDGEOCODEPOINT, ZONA, ATE FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT WHERE DOMCOD = :domcod) B 
       WHERE SDO_WITHIN_DISTANCE ( B.COORDGEOCODEPOINT, A.COORDGEOCODEPOINT, 'distance=' || :diam || ' unit=meter') = 'TRUE'`,
       {
-        domcod: activitat.DOMCOD,
+        domcod: DOMCOD,
         grup: activitat.descripcio_grup,
         subgrup: activitat.descripcio_subgrup,
         diam: activitat.valor_condicio
       },
       { autoCommit: true }
     );
+
     if ((activitat.id_condicio == 4 || activitat.id_condicio == 5) && result.rows.length == 0) {
       return true;
     }
