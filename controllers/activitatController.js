@@ -99,6 +99,9 @@ const pdfConsulta = async (req, res) => {
       pis: fila.PIS
     }
 
+    if (isOlot)
+      await inserirVista(connection, fila.COORD_X, fila.COORD_Y, consultaId);
+
     // Aquí generem el PDF i l’enviem
     await generarPDF(isConsultaValida(activitat, connection, adreca), activitat, adreca, res);
 
@@ -191,11 +194,14 @@ const consultaActivitat = async (req, res) => {
     } else {
       let is_apte = await isConsultaValida(activitat, connection, adreca);
 
-      // Executa la consulta per inserir la cosulta a la base de dades
-      let insertedId;
       const result = await connection.execute(
-        `INSERT INTO ecpu_consulta (DNI_interessat, nom_interessat, actuacio_interessat, DOMCOD, grup_id, grup_descripcio, subgrup_id, subgrup_descripcio, activitat_id, condicio_id, valor_condicio, is_altres, descripcio_altres, is_valid, coord_x, coord_y) 
-     VALUES (:DNI_interessat, :nom_interessat, :actuacio_interessat, :DOMCOD, :grup_id, :grup_descripcio, :subgrup_id, :subgrup_descripcio, :activitat_id, :condicio_id, :valor_condicio, :is_altres, :descripcio_altres, :is_valid, :coord_x, :coord_y) RETURNING id INTO :insertedId`,
+        `BEGIN ECPU_INSERIR_CONSULTA_I_VISTA_BUFFER(
+          :DNI_interessat, :nom_interessat, :actuacio_interessat, :DOMCOD,
+          :grup_id, :grup_descripcio, :subgrup_id, :subgrup_descripcio,
+          :activitat_id, :condicio_id, :valor_condicio,
+          :is_altres, :descripcio_altres, :is_valid,
+          :coord_x, :coord_y, :insertedId
+        ); END;`,
         {
           DNI_interessat: usuari.dni,
           nom_interessat: usuari.nom,
@@ -210,7 +216,7 @@ const consultaActivitat = async (req, res) => {
           valor_condicio: !activitat.is_altres ? activitat.valor_condicio : null,
           is_altres: activitat.is_altres ? 1 : 0,
           descripcio_altres: !activitat.is_altres ? null : activitat.descripcio_activitat,
-          is_valid: is_apte ? '1' : '0',
+          is_valid: is_apte ? 1 : 0,
           coord_x: adreca.coord_x,
           coord_y: adreca.coord_y,
           insertedId: { type: oracledb.NUMBER, dir: oracledb.BIND_OUT }
@@ -221,11 +227,6 @@ const consultaActivitat = async (req, res) => {
       if (result.rowsAffected === 0) {
         return res.status(404).send('No s\'ha pogut crear la consulta');
       }
-
-      insertedId = result.outBinds.insertedId[0];
-
-      // Inserir vista.
-      await inserirVista(connection, adreca.coord_x, adreca.coord_y, insertedId);
 
       // Aquí generem el PDF i l'enviem en la resposta HTTP
       await generarPDF(is_apte, activitat, adreca, res);
@@ -334,9 +335,6 @@ function generarPDF(is_apte, activitat, adreca, res) {
       const browser = await puppeteer.launch();
       const page = await browser.newPage();
       await page.goto(mapaUrl, { waitUntil: 'networkidle0' });
-
-      // Esperar 1 segon addicional (pots ajustar el temps si cal)
-      await new Promise(resolve => setTimeout(resolve, 5000));
 
       // Captura de la pàgina (o part visible)
       const screenshotPath = path.join(os.tmpdir(), 'mapa_temp.png');
