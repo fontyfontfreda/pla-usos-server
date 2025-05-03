@@ -4,7 +4,8 @@ const PDFDocument = require('pdfkit');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const os = require('os');
-const path = require('path');
+
+
 const isOlot = process.env.IS_OLOT === 'true';
 
 const getAllActivitats = async (req, res) => {
@@ -475,5 +476,4 @@ module.exports = {
   getActivitats,
   consultaActivitat,
   getAllActivitats,
-  pdfConsulta
-};
+  pdfConsulta};

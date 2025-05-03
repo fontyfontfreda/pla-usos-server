@@ -32,6 +32,7 @@ router.use(authMiddleware.verifyToken);
 
 //ADRECES
 router.post('/uploadAdreces', upload.single('file'), adrecaController.uploadAdreces);
+router.put('/adreces/:domcod', upload.single('imatge'), adrecaController.actualitzarAdreca);
 
 //CONDICIONS
 router.post('/upload', upload.single('file'), condicioController.processUpload);

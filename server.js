@@ -7,8 +7,11 @@ require('dotenv').config();  // Carregar les variables d'entorn del fitxer .env
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Permet fins a 50 MB per JSON i formularis
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 app.use(cors());
-app.use(express.json());
 
 connectDB()  // Intentar establir la connexió abans d'iniciar el servidor
   .then(() => {

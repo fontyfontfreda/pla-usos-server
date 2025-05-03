@@ -1,6 +1,26 @@
 const db = require('../models/db');
-const xlsx = require('xlsx');
 const oracledb = require('oracledb');
+const xlsx = require('xlsx');
+const express = require('express');
+const router = express.Router();
+const multer = require('multer');
+const fs = require('fs');
+const path = require('path');
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, process.env.IMATGE_RUTA); // carpeta on es desen les imatges
+  },
+  filename: (req, file, cb) => {
+    const uniqueName = Date.now() + '-' + file.originalname.replace(/\s/g, '');
+    cb(null, uniqueName);
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 20 * 1024 * 1024 } // Limit de mida de 20 MB per fitxer
+});
 
 const uploadAdreces = async (req, res) => {
   let connection;
@@ -124,7 +144,85 @@ const getAdreces = async (req, res) => {
   }
 };
 
+const actualitzarAdreca = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+
+    const domcod = req.body.adreca.DOMCOD;
+    const { tipus_dom, tipus_loc, amplada_carrer, imatge } = req.body.adreca;
+
+    // Si es proporciona una imatge en base64, la convertirem en un fitxer
+    let imatgeRuta = null;
+    if (imatge) {
+      // Eliminar el prefix de la cadena base64 (data:image/png;base64,)
+      const base64Data = imatge.replace(/^data:image\/\w+;base64,/, '');
+      
+      // Generar un nom únic per al fitxer
+      const nomFitxer = `${domcod}.png`; // O canvia l'extensió segons el tipus d'imatge
+
+      // Definir la ruta completa per a desar el fitxer
+      imatgeRuta = process.env.IMATGE_RUTA + nomFitxer;
+
+      // Comprovar si la carpeta existeix, i si no, crear-la
+      const carpetaDestinacio = path.dirname(imatgeRuta); // Obtenim la carpeta on es desa la imatge
+      if (!fs.existsSync(carpetaDestinacio)) {
+        fs.mkdirSync(carpetaDestinacio, { recursive: true });
+      }
+
+      // Convertir la cadena base64 en un buffer i desar-la com un fitxer
+      fs.writeFileSync(imatgeRuta, base64Data, 'base64');
+      
+      // La ruta relativament desada a la base de dades serà la ruta pública
+      imatgeRuta = `/assets/${nomFitxer}`;
+    }
+
+    // Consulta d'actualització
+    let updateQuery = `
+      UPDATE ECPU_ADRECA 
+      SET TIPUS_DOM = :tipus_dom,
+          TIPUS_LOC = :tipus_loc,
+          AMPLADA_CARRER = :amplada_carrer
+    `;
+
+    // Afegir la imatge només si existeix
+    if (imatgeRuta) {
+      updateQuery += `, IMATGE = :imatge`;
+    }
+
+    updateQuery += ` WHERE DOMCOD = :domcod`;
+
+    // Definir els binds
+    const binds = {
+      tipus_dom,
+      tipus_loc,
+      amplada_carrer,
+      domcod
+    };
+
+    // Afegir imatge als binds només si es proporciona
+    if (imatgeRuta) {
+      binds.imatge = imatgeRuta;
+    }
+
+    // Executar la consulta
+    await connection.execute(updateQuery, binds, { autoCommit: true });
+
+    res.status(200).json({ missatge: 'Adreça actualitzada correctament' });
+
+  } catch (error) {
+    console.error('❌ Error actualitzant l’adreça:', error);
+    res.status(500).json({ error: 'Error del servidor' });
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+
+
+
 module.exports = {
   getAdreces,
-  uploadAdreces
+  uploadAdreces,
+  actualitzarAdreca
 };
