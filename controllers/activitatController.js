@@ -4,7 +4,7 @@ const PDFDocument = require('pdfkit');
 const puppeteer = require('puppeteer');
 const fs = require('fs');
 const os = require('os');
-
+const path = require('path');
 
 const isOlot = process.env.IS_OLOT === 'true';
 
@@ -331,15 +331,24 @@ function generarPDF(is_apte, activitat, adreca, res) {
     else
       mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}`;
 
+
     try {
-      // Llançar navegador i capturar la pàgina
+      // Lançar el navegador i carregar la pàgina
       const browser = await puppeteer.launch();
       const page = await browser.newPage();
+
       await page.goto(mapaUrl, { waitUntil: 'networkidle0' });
 
-      // Captura de la pàgina (o part visible)
+      // Esperar que el mapa es carregui
+      await page.waitForSelector('#map', { visible: true });
+
+      // Afegir pausa per assegurar que desapareixen capes temporals
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Captura només de la zona del mapa
       const screenshotPath = path.join(os.tmpdir(), 'mapa_temp.png');
-      await page.screenshot({ path: screenshotPath, fullPage: true });
+      const mapaElement = await page.$('#map');
+      await mapaElement.screenshot({ path: screenshotPath });
 
       await browser.close();
 
