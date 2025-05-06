@@ -481,8 +481,124 @@ async function consultaBuffer(connection, activitat, DOMCOD) {
     return false;
 }
 
+const getActivitat = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+    const activitat = req.params.activitat;
+
+    if (!activitat) {
+      console.error('❌ Falta el paràmetre activitat:', error);
+      res.status(400).send('❌ Falta el paràmetre activitat');
+    } else {
+      const result = await connection.execute(
+        `SELECT
+              aac.id,
+              0 AS is_zona,
+              z.codi || '.' || at.codi AS codi, 
+              aac.condicio_id,
+              c.descripcio AS condicio, 
+              aac.valor,
+              da.descripcio
+          FROM ecpu_area_activitat_condicio aac
+          JOIN ecpu_descripcio_activitat da ON da.id = aac.descripcio_activitat_id
+          JOIN ecpu_area_tractament at ON at.id = aac.area_id
+          JOIN ecpu_zona z ON at.id_zona = z.id
+          JOIN ecpu_condicio c ON c.id = aac.condicio_id
+          WHERE da.descripcio = :activitat
+          UNION
+          SELECT
+              zac.id,
+              1 AS is_zona,
+              TO_CHAR(z.codi) AS codi,
+              zac.condicio_id,
+              c.descripcio AS condicio, 
+              zac.valor,
+              da.descripcio
+          FROM ecpu_zona_activitat_condicio zac
+          JOIN ecpu_descripcio_activitat da ON da.id = zac.descripcio_activitat_id
+          JOIN ecpu_zona z ON zac.zona_id = z.id
+          JOIN ecpu_condicio c ON c.id = zac.condicio_id
+          WHERE da.descripcio = :activitat
+          ORDER BY codi`,
+        {
+          activitat: activitat
+        },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      );
+
+      // Convertim els LOBs a string
+      const rows = await Promise.all(result.rows.map(async row => {
+        return row;
+      }));
+  
+      if (rows.length === 0) {
+        return res.status(404).send('No s\'ha trobat cap consulta');
+      }
+  
+      res.status(200).json(rows);
+    }
+  } catch (error) {
+    console.error('❌ Error obtenint les dades:', error);
+    res.status(500).send('Error obtenint les dades');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+const updateCondicio = async (req, res) => {
+  let connection;
+  try {
+    const { condicio } = req.body;
+
+    connection = await db();
+
+    if (condicio.IS_ZONA) {
+      const result = await connection.execute(
+        `UPDATE ecpu_zona_activitat_condicio SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
+        {
+          condicio_id: condicio.CONDICIO_ID,
+          valor: condicio.VALOR,
+          id: condicio.ID
+        },
+        { autoCommit: true }
+      );
+
+      if (result.rowsAffected === 0) {
+        return res.status(404).send('Condició no trobada.');
+      }
+
+      res.status(200).send('Condició actualitzada correctament.');
+    }else {
+      const result = await connection.execute(
+        `UPDATE ecpu_area_activitat_condicio SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
+        {
+          condicio_id: condicio.CONDICIO_ID,
+          valor: condicio.VALOR,
+          id: condicio.ID
+        },
+        { autoCommit: true }
+      );
+
+      if (result.rowsAffected === 0) {
+        return res.status(404).send('Condició no trobada.');
+      }
+
+      res.status(200).send('Condició actualitzada correctament.');
+    }    
+  } catch (error) {
+    console.error('❌ Error actualitzant la condició:', error);
+    res.status(500).send('Error actualitzant la condició.');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
 module.exports = {
   getActivitats,
   consultaActivitat,
   getAllActivitats,
-  pdfConsulta};
+  pdfConsulta,
+  getActivitat,
+  updateCondicio
+};
