@@ -169,12 +169,10 @@ const actualitzarAdreca = async (req, res) => {
       if (!fs.existsSync(carpetaDestinacio)) {
         fs.mkdirSync(carpetaDestinacio, { recursive: true });
       }
-
+      console.log(imatgeRuta);
+      
       // Convertir la cadena base64 en un buffer i desar-la com un fitxer
       fs.writeFileSync(imatgeRuta, base64Data, 'base64');
-      
-      // La ruta relativament desada a la base de dades serà la ruta pública
-      imatgeRuta = `/assets/${nomFitxer}`;
     }
 
     // Consulta d'actualització

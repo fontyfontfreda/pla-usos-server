@@ -398,9 +398,40 @@ function generarPDF(is_apte, activitat, adreca, res) {
         .fontSize(12)
         .text(titolInformacioPDF(is_apte, activitat.id_condicio), { align: 'center' });
       doc.moveDown(2);
+
+      let motiu;
+      if (is_apte) {
+        motiu = '';
+      } else {
+          switch (activitat.id_condicio) {
+            case 4:
+              motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 50 metres.';
+              break;
+            case 5:
+              motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 100 metres.';
+              break;
+            case 6:
+              motiu = 'Motiu: Ja hi ha ' + activitat.valor_condicio + 'activitats del mateix grup en un radi de 50 metres.';
+              break;
+            case 7:
+              motiu = 'Motiu: El carrer fa menys de '+ activitat.valor_condicio +' metres.';
+              break;
+            case 9:
+              motiu = 'Motiu: El local no es troba en un 1r pis.';
+              break;
+            default:
+              motiu = '';
+              break;
+          }
+      }
       doc.font('Helvetica')
-        .fontSize(10)
-        .text(``, { align: 'left' });
+          .fontSize(10)
+          .text(motiu, { align: 'left' });
+      
+          doc.font('Helvetica')
+          .fontSize(10)
+          .text('', { align: 'left' });
+
 
       // Paràgraf 1
       if (activitat.id_condicio != 1 && activitat.id_condicio != 2 && activitat.id_condicio != 3 && is_apte) {
@@ -531,11 +562,11 @@ const getActivitat = async (req, res) => {
       const rows = await Promise.all(result.rows.map(async row => {
         return row;
       }));
-  
+
       if (rows.length === 0) {
         return res.status(404).send('No s\'ha trobat cap consulta');
       }
-  
+
       res.status(200).json(rows);
     }
   } catch (error) {
@@ -569,7 +600,7 @@ const updateCondicio = async (req, res) => {
       }
 
       res.status(200).send('Condició actualitzada correctament.');
-    }else {
+    } else {
       const result = await connection.execute(
         `UPDATE ecpu_area_activitat_condicio SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
         {
@@ -585,7 +616,7 @@ const updateCondicio = async (req, res) => {
       }
 
       res.status(200).send('Condició actualitzada correctament.');
-    }    
+    }
   } catch (error) {
     console.error('❌ Error actualitzant la condició:', error);
     res.status(500).send('Error actualitzant la condició.');
