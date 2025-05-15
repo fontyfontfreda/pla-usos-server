@@ -403,34 +403,34 @@ function generarPDF(is_apte, activitat, adreca, res) {
       if (is_apte) {
         motiu = '';
       } else {
-          switch (activitat.id_condicio) {
-            case 4:
-              motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 50 metres.';
-              break;
-            case 5:
-              motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 100 metres.';
-              break;
-            case 6:
-              motiu = 'Motiu: Ja hi ha ' + activitat.valor_condicio + 'activitats del mateix grup en un radi de 50 metres.';
-              break;
-            case 7:
-              motiu = 'Motiu: El carrer fa menys de '+ activitat.valor_condicio +' metres.';
-              break;
-            case 9:
-              motiu = 'Motiu: El local no es troba en un 1r pis.';
-              break;
-            default:
-              motiu = '';
-              break;
-          }
+        switch (activitat.id_condicio) {
+          case 4:
+            motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 50 metres.';
+            break;
+          case 5:
+            motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 100 metres.';
+            break;
+          case 6:
+            motiu = 'Motiu: Ja hi ha ' + activitat.valor_condicio + 'activitats del mateix grup en un radi de 50 metres.';
+            break;
+          case 7:
+            motiu = 'Motiu: El carrer fa menys de ' + activitat.valor_condicio + ' metres.';
+            break;
+          case 9:
+            motiu = 'Motiu: El local no es troba en un 1r pis.';
+            break;
+          default:
+            motiu = '';
+            break;
+        }
       }
       doc.font('Helvetica')
-          .fontSize(10)
-          .text(motiu, { align: 'left' });
-      
-          doc.font('Helvetica')
-          .fontSize(10)
-          .text('', { align: 'left' });
+        .fontSize(10)
+        .text(motiu, { align: 'left' });
+
+      doc.font('Helvetica')
+        .fontSize(10)
+        .text('', { align: 'left' });
 
 
       // Paràgraf 1
@@ -625,11 +625,154 @@ const updateCondicio = async (req, res) => {
   }
 };
 
+const getZones = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+
+    const result = await connection.execute(
+      `SELECT ID, CODI FROM ECPU_ZONA`,
+      {},
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    // Convertim els LOBs a string
+    const rows = await Promise.all(result.rows.map(async row => {
+      return row;
+    }));
+
+    if (rows.length === 0) {
+      return res.status(404).send('No s\'ha trobat cap zona');
+    }
+
+    res.status(200).json(rows);
+
+  } catch (error) {
+    console.error('❌ Error obtenint les dades:', error);
+    res.status(500).send('Error obtenint les dades');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+const getArees = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+
+    const result = await connection.execute(
+      `SELECT a.ID, z.codi || '.' || a.codi AS codi
+        FROM ECPU_ZONA z
+        JOIN ecpu_area_tractament a ON a.id_zona = z.id`,
+      {},
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    // Convertim els LOBs a string
+    const rows = await Promise.all(result.rows.map(async row => {
+      return row;
+    }));
+
+    if (rows.length === 0) {
+      return res.status(404).send('No s\'ha trobat cap zona');
+    }
+
+    res.status(200).json(rows);
+
+  } catch (error) {
+    console.error('❌ Error obtenint les dades:', error);
+    res.status(500).send('Error obtenint les dades');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+const addActivitat = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+
+    const { dades } = req.body;
+    const condicions = dades.CONDICIONS;
+
+    const result = await connection.execute(
+      `BEGIN 
+         ecpu_crear_activitat(
+           :p_grup,
+           :p_codi_grup,
+           :p_subgrup,
+           :p_codi_subgrup,
+           :p_activitat,
+           :p_codi_activitat,
+           :p_id_activitat
+         ); 
+       END;`,
+      {
+        p_grup: dades.GRUP,
+        p_codi_grup: dades.CODI_GRUP,
+        p_subgrup: dades.SUBGRUP,
+        p_codi_subgrup: dades.CODI_SUBGRUP,
+        p_activitat: dades.DESCRIPCIO,
+        p_codi_activitat: dades.CODI_ACTIVITAT,
+        p_id_activitat: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
+      }
+    );
+
+    const idActivitat = result.outBinds.p_id_activitat;
+
+    for (const condicio of condicions) {
+      if (condicio.IS_ZONA == 1) {
+        await connection.execute(
+          `INSERT INTO ecpu_zona_activitat_condicio (
+              ID, ZONA_ID, DESCRIPCIO_ACTIVITAT_ID, CONDICIO_ID, VALOR
+            ) VALUES (
+              seq_ecpu_zona_activitat_condicio.NEXTVAL, :zona_id, :idActivitat, :id_condicio, :valor
+            )`,
+          {
+            zona_id: condicio.ID_ZONA,
+            idActivitat,
+            id_condicio: condicio.CONDICIO_ID,
+            valor: condicio.VALOR
+          },
+          { autoCommit: true }
+        );
+
+      } else {
+        await connection.execute(
+          `INSERT INTO ecpu_area_activitat_condicio 
+           (ID, AREA_ID, DESCRIPCIO_ACTIVITAT_ID, CONDICIO_ID, VALOR) 
+           VALUES (seq_ecpu_area_activitat_condicio.NEXTVAL, :zona_id, :idActivitat, :id_condicio, :valor)`,
+          {
+            zona_id: condicio.ID_ZONA,
+            idActivitat: idActivitat,
+            id_condicio: +condicio.CONDICIO_ID,
+            valor: condicio.VALOR == null ? condicio.VALOR : +condicio.VALOR
+          }
+        );
+      }
+    }
+
+    await connection.commit(); // Fa el commit només un cop al final
+
+    res.status(200).send('Epígraf creat correctament.');
+
+  } catch (error) {
+    console.error('❌ Error actualitzant la condició:', error);
+    res.status(500).send('Error actualitzant la condició.');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+
 module.exports = {
   getActivitats,
   consultaActivitat,
   getAllActivitats,
   pdfConsulta,
   getActivitat,
-  updateCondicio
+  updateCondicio,
+  getZones,
+  getArees,
+  addActivitat
 };
