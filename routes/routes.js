@@ -13,6 +13,8 @@ const router = express.Router();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+router.get('/health', (req, res) => {res.send(200, { message: 'ok' });});
+
 // Ruta d'autenticació (no protegida)
 router.post('/login', authController.login);
 router.post('/register', authController.register);
@@ -26,6 +28,7 @@ router.get('/zones', zonaController.getZones);
 //ACTIVITATS
 router.get('/activitats/:domcod', activitatController.getActivitats);
 router.post('/activitats/consulta', activitatController.consultaActivitat);
+
 
 // Protegir totes les rutes amb JWT middleware (a excepció de les rutes de login i registre)
 router.use(authMiddleware.verifyToken);
