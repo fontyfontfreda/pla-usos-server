@@ -274,10 +274,16 @@ async function isConsultaValida(activitat, connection, adreca) {
       // amplaria carrer
       is_apte = adreca.amplada_carrer >= activitat.valor_condicio;
       break;
+    case 8:
+      is_apte = true;
     case 9:
       // ubicacio parcel·la
       is_apte = adreca.pis == +1;
       break;
+    case 10:
+      is_apte = true;
+    case 11:
+      is_apte = true;
     default:
       break;
   }

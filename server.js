@@ -15,7 +15,7 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors());
 
 // Exposa públicament la carpeta d’imatges
-app.use('/imatges', express.static(path.join('C:/Users/AIT/Documents/IMATGES')));
+app.use('/imatges', express.static(path.join(process.env.IMATGE_RUTA)));
 
 // Rutes de l'API
 app.use('/api', routes);
