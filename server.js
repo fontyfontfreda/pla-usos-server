@@ -1,8 +1,9 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const routes = require('./routes/routes');
-const connectDB = require('./models/db');  // Importar la funció de connexió a la base de dades
-require('dotenv').config();  // Carregar les variables d'entorn del fitxer .env
+const connectDB = require('./models/db');
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,7 +14,13 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 app.use(cors());
 
-connectDB()  // Intentar establir la connexió abans d'iniciar el servidor
+// Exposa públicament la carpeta d’imatges
+app.use('/imatges', express.static(path.join('C:/Users/AIT/Documents/IMATGES')));
+
+// Rutes de l'API
+app.use('/api', routes);
+
+connectDB()
   .then(() => {
     console.log(`🚀 Connexió a la base de dades establerta amb èxit!`);
     app.listen(PORT, () => {
@@ -22,8 +29,5 @@ connectDB()  // Intentar establir la connexió abans d'iniciar el servidor
   })
   .catch((err) => {
     console.error('❌ Error al connectar-se a la base de dades:', err);
-    process.exit(1);  // Finalitzar l'aplicació si no es pot establir la connexió
+    process.exit(1);
   });
-
-// Rutes de l'API
-app.use('/api', routes);

@@ -30,6 +30,7 @@ const getConsultes = async (req, res) => {
           LEFT JOIN ecpu_subgrup_activitat s ON s.id = c.subgrup_id
           LEFT JOIN ecpu_descripcio_activitat ac ON ac.id = c.activitat_id
           LEFT JOIN ecpu_condicio co ON co.id = c.condicio_id
+          ORDER BY c.CREATED_AT DESC
           `,
         [],
         { outFormat: oracledb.OUT_FORMAT_OBJECT }

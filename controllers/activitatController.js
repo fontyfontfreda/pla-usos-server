@@ -326,8 +326,10 @@ function generarPDF(is_apte, activitat, adreca, res) {
   return new Promise(async (resolve, reject) => {
     let mapaUrl = '';
 
-    if (activitat.id_condicio == 4 || activitat.id_condicio == 5 || activitat.id_condicio == 6 || activitat.id_condicio == 7)
+    if (activitat.id_condicio == 4 || activitat.id_condicio == 5 || activitat.id_condicio == 7)
       mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos_informe.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}&diam=${activitat.valor_condicio}`;
+    else if (activitat.id_condicio == 6)
+      mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos_informe.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}&diam=50`;
     else
       mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}`;
 
@@ -430,7 +432,7 @@ function generarPDF(is_apte, activitat, adreca, res) {
 
       doc.font('Helvetica')
         .fontSize(10)
-        .text('', { align: 'left' });
+        .text('\n', { align: 'left' });
 
 
       // Paràgraf 1

@@ -6,6 +6,8 @@ const router = express.Router();
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const sharp = require('sharp');
+
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -111,7 +113,7 @@ const getAdreces = async (req, res) => {
   try {
     connection = await db();
     const result = await connection.execute(
-      `SELECT DOMCOD, 
+      `SELECT a.DOMCOD, 
         tc.descripcio || ' ' || a.carrer || ' Núm. ' || a.numero || 
         CASE WHEN a.pis IS NOT NULL THEN ' Pis ' || a.pis ELSE '' END || 
         CASE WHEN a.porta IS NOT NULL THEN ' Pta. ' || a.porta ELSE '' END AS "adreca",
@@ -120,11 +122,12 @@ const getAdreces = async (req, res) => {
         'ZR-' || z.codi AS "codi_zona", 
         a.area_tractament_id AS "area_tractament_id", 
         CASE WHEN at.codi IS NOT NULL THEN 'ATE ' || z.codi || '.' || at.codi ELSE NULL END AS "codi_area", 
-        a.tipus_carrer_id AS "tipus_carrer_id", a.imatge AS "imatge" 
+        a.tipus_carrer_id AS "tipus_carrer_id", ai.imatge AS "imatge" 
       FROM ecpu_adreca a 
       JOIN ecpu_tipus_carrer tc ON a.tipus_carrer_id = tc.id 
       JOIN ecpu_zona z ON a.zona_id = z.id 
-      LEFT JOIN ecpu_area_tractament at ON a.area_tractament_id = at.id`,
+      LEFT JOIN ecpu_area_tractament at ON a.area_tractament_id = at.id
+      LEFT JOIN ECPU_ADRECA_IMATGE ai ON ai.DOMCOD = a.DOMCOD`,
       [],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -152,59 +155,62 @@ const actualitzarAdreca = async (req, res) => {
     const domcod = req.body.adreca.DOMCOD;
     const { tipus_dom, tipus_loc, amplada_carrer, imatge } = req.body.adreca;
 
-    // Si es proporciona una imatge en base64, la convertirem en un fitxer
     let imatgeRuta = null;
     if (imatge) {
-      // Eliminar el prefix de la cadena base64 (data:image/png;base64,)
       const base64Data = imatge.replace(/^data:image\/\w+;base64,/, '');
-      
-      // Generar un nom únic per al fitxer
-      const nomFitxer = `${domcod}.png`; // O canvia l'extensió segons el tipus d'imatge
-
-      // Definir la ruta completa per a desar el fitxer
+      const nomFitxer = `${domcod}.png`;
       imatgeRuta = process.env.IMATGE_RUTA + nomFitxer;
-
-      // Comprovar si la carpeta existeix, i si no, crear-la
-      const carpetaDestinacio = path.dirname(imatgeRuta); // Obtenim la carpeta on es desa la imatge
+    
+      const carpetaDestinacio = path.dirname(imatgeRuta);
       if (!fs.existsSync(carpetaDestinacio)) {
         fs.mkdirSync(carpetaDestinacio, { recursive: true });
       }
-      console.log(imatgeRuta);
-      
-      // Convertir la cadena base64 en un buffer i desar-la com un fitxer
-      fs.writeFileSync(imatgeRuta, base64Data, 'base64');
+    
+      const buffer = Buffer.from(base64Data, 'base64');
+    
+      // Redimensionar i optimitzar amb sharp
+      await sharp(buffer)
+        .resize({ width: 800 })       // Amplada màxima de 800px
+        .png({ quality: 70 })         // Qualitat al 80%
+        .toFile(imatgeRuta);
     }
+    
 
-    // Consulta d'actualització
-    let updateQuery = `
+    // Actualitzar la taula principal
+    const updateQuery = `
       UPDATE ECPU_ADRECA 
       SET TIPUS_DOM = :tipus_dom,
           TIPUS_LOC = :tipus_loc,
           AMPLADA_CARRER = :amplada_carrer
+      WHERE DOMCOD = :domcod
     `;
 
-    // Afegir la imatge només si existeix
-    if (imatgeRuta) {
-      updateQuery += `, IMATGE = :imatge`;
-    }
-
-    updateQuery += ` WHERE DOMCOD = :domcod`;
-
-    // Definir els binds
-    const binds = {
+    await connection.execute(updateQuery, {
       tipus_dom,
       tipus_loc,
       amplada_carrer,
       domcod
-    };
+    });
 
-    // Afegir imatge als binds només si es proporciona
+    // Inserir o actualitzar la imatge, si es proporciona
     if (imatgeRuta) {
-      binds.imatge = imatgeRuta;
+      const mergeQuery = `
+        MERGE INTO ECPU_ADRECA_IMATGE img
+        USING (SELECT :domcod AS DOMCOD FROM DUAL) d
+        ON (img.DOMCOD = d.DOMCOD)
+        WHEN MATCHED THEN
+          UPDATE SET img.IMATGE = :imatge
+        WHEN NOT MATCHED THEN
+          INSERT (DOMCOD, IMATGE) VALUES (:domcod, :imatge)
+      `;
+
+      await connection.execute(mergeQuery, {
+        domcod,
+        imatge: process.env.IMATGE_RUTA_SERVIDOR + domcod + '.png'
+      });
     }
 
-    // Executar la consulta
-    await connection.execute(updateQuery, binds, { autoCommit: true });
+    await connection.commit();
 
     res.status(200).json({ missatge: 'Adreça actualitzada correctament' });
 
