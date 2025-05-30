@@ -136,24 +136,25 @@ const getActivitats = async (req, res) => {
       if (result.rows[0].AREA_TRACTAMENT_ID === null) {
         // L'adreça no pertany a cap àrea, fem cerca de condicions per zona
         const zonaResult = await connection.execute(
-          `SELECT ga.codi AS "codi_grup", ga.descripcio AS "descripcio_grup", sa.codi AS "codi_subgrup", 
+          `SELECT ga.codi AS "codi_grup", ga.descripcio AS "descripcio_grup", sa.id AS "id_subgrup", sa.codi AS "codi_subgrup", 
                   sa.descripcio AS "descripcio_subgrup", da.id AS "codi_descripcio_activitat", 
                   da.descripcio AS "descripcio_descripcio_activitat", c.id AS "id_condicio", 
                   zac.valor AS "valor_condicio", c.descripcio AS "condicio"
            FROM ecpu_zona_activitat_condicio zac 
-           JOIN ecpu_condicio c ON zac.condicio_id = c.id 
-           JOIN ecpu_descripcio_activitat da ON zac.descripcio_activitat_id = da.id 
-           JOIN ecpu_subgrup_activitat sa ON da.id_subgrup_activitat = sa.id 
-           JOIN ecpu_grup_activitat ga ON sa.codi_grup_activitat = ga.codi 
+           INNER JOIN ecpu_condicio c ON zac.condicio_id = c.id 
+           INNER JOIN ecpu_descripcio_activitat da ON zac.descripcio_activitat_id = da.id 
+           INNER JOIN ecpu_subgrup_activitat sa ON da.id_subgrup_activitat = sa.id 
+           INNER JOIN ecpu_grup_activitat ga ON sa.codi_grup_activitat = ga.codi 
            WHERE zona_id = :zona_id`,
           [result.rows[0].ZONA_ID],
           { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
+
         condicions = zonaResult.rows;
       } else {
         // L'adreça pertany a una àrea, fem cerca de condicions per àrea
         const areaResult = await connection.execute(
-          `SELECT ga.codi AS "codi_grup", ga.descripcio AS "descripcio_grup", sa.codi AS "codi_subgrup", 
+          `SELECT ga.codi AS "codi_grup", ga.descripcio AS "descripcio_grup", sa.id AS "id_subgrup", sa.codi AS "codi_subgrup", 
                   sa.descripcio AS "descripcio_subgrup", da.id AS "codi_descripcio_activitat", 
                   da.descripcio AS "descripcio_descripcio_activitat", c.id AS "id_condicio", 
                   aac.valor AS "valor_condicio", c.descripcio AS "condicio" 
@@ -210,7 +211,7 @@ const consultaActivitat = async (req, res) => {
           DOMCOD: adreca.DOMCOD,
           grup_id: !activitat.is_altres ? activitat.codi_grup : null,
           grup_descripcio: !activitat.is_altres ? activitat.descripcio_grup : null,
-          subgrup_id: !activitat.is_altres ? activitat.codi_subgrup : null,
+          subgrup_id: !activitat.is_altres ? activitat.id_subgrup : null,
           subgrup_descripcio: !activitat.is_altres ? activitat.descripcio_subgrup : null,
           activitat_id: !activitat.is_altres ? activitat.codi_descripcio_activitat : null,
           condicio_id: !activitat.is_altres ? activitat.id_condicio : null,
@@ -419,7 +420,7 @@ function generarPDF(is_apte, activitat, adreca, res) {
             motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 100 metres.';
             break;
           case 6:
-            motiu = 'Motiu: Ja hi ha ' + activitat.valor_condicio + 'activitats del mateix grup en un radi de 50 metres.';
+            motiu = 'Motiu: Ja hi ha ' + activitat.valor_condicio + ' activitats del mateix grup en un radi de 50 metres.';
             break;
           case 7:
             motiu = 'Motiu: El carrer fa menys de ' + activitat.valor_condicio + ' metres.';
