@@ -202,7 +202,7 @@ const consultaActivitat = async (req, res) => {
       // Enviar correu a consorci
     } else {
 
-      let is_apte = await isConsultaValida(activitat, connection, adreca);
+      let is_apte = await isConsultaValida(activitat, connection, adreca);      
 
       const result = await connection.execute(
         `BEGIN ECPU_INSERIR_CONSULTA_I_VISTA_BUFFER(
@@ -233,6 +233,10 @@ const consultaActivitat = async (req, res) => {
         },
         { autoCommit: true }
       );
+
+      if (isOlot)
+        await inserirVista(connection, adreca.coord_x, adreca.coord_y, result.outBinds.insertedId);
+      
 
       if (result.rowsAffected === 0) {
         return res.status(404).send('No s\'ha pogut crear la consulta');
