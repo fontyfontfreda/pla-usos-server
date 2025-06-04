@@ -369,7 +369,7 @@ function generarPDF(is_apte, activitat, adreca) {
       await page.waitForSelector('#map', { visible: true });
 
       // Afegir pausa per assegurar que desapareixen capes temporals
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 10000));
 
       // Captura només de la zona del mapa
       const screenshotPath = path.join(os.tmpdir(), 'mapa_temp.png');
