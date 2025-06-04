@@ -8,7 +8,6 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
-
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, process.env.IMATGE_RUTA); // carpeta on es desen les imatges
@@ -112,33 +111,57 @@ const getAdreces = async (req, res) => {
   let connection;
   try {
     connection = await db();
-    const result = await connection.execute(
-      `SELECT a.DOMCOD, 
-        tc.descripcio || ' ' || a.carrer || ' Núm. ' || a.numero || 
-        CASE WHEN a.pis IS NOT NULL THEN ' Pis ' || a.pis ELSE '' END || 
-        CASE WHEN a.porta IS NOT NULL THEN ' Pta. ' || a.porta ELSE '' END AS "adreca",
-        a.nucli_cod AS "nucli_cod", a.codi_carrer AS "codi_carrer", a.carrer AS "carrer", a.numero AS "numero", a.bis AS "bis", a.pis AS "pis", a.porta AS "porta", 
-        a.tipus_dom AS "tipus_dom", a.tipus_loc AS "tipus_loc", a.amplada_carrer AS "amplada_carrer", a.coord_x AS "coord_x", a.coord_y AS "coord_y", a.zona_id AS "zona_id", 
-        'ZR-' || z.codi AS "codi_zona", 
-        a.area_tractament_id AS "area_tractament_id", 
-        CASE WHEN at.codi IS NOT NULL THEN 'ATE ' || z.codi || '.' || at.codi ELSE NULL END AS "codi_area", 
-        a.tipus_carrer_id AS "tipus_carrer_id", ai.imatge AS "imatge" 
-      FROM ecpu_adreca a 
-      JOIN ecpu_tipus_carrer tc ON a.tipus_carrer_id = tc.id 
-      JOIN ecpu_zona z ON a.zona_id = z.id 
-      LEFT JOIN ecpu_area_tractament at ON a.area_tractament_id = at.id
-      LEFT JOIN ECPU_ADRECA_IMATGE ai ON ai.DOMCOD = a.DOMCOD`,
-      [],
-      { outFormat: oracledb.OUT_FORMAT_OBJECT }
-    );
+   const result = await connection.execute(
+    `SELECT a.DOMCOD, 
+      tc.descripcio || ' ' || a.carrer || ' Núm. ' || a.numero || 
+      CASE WHEN a.pis IS NOT NULL THEN ' Pis ' || a.pis ELSE '' END || 
+      CASE WHEN a.porta IS NOT NULL THEN ' Pta. ' || a.porta ELSE '' END AS "adreca",
+      a.nucli_cod AS "nucli_cod", a.codi_carrer AS "codi_carrer", a.carrer AS "carrer", a.numero AS "numero", a.bis AS "bis", a.pis AS "pis", a.porta AS "porta", 
+      a.tipus_dom AS "tipus_dom", a.tipus_loc AS "tipus_loc", a.amplada_carrer AS "amplada_carrer", a.coord_x AS "coord_x", a.coord_y AS "coord_y", a.zona_id AS "zona_id", 
+      'ZR-' || z.codi AS "codi_zona", 
+      a.area_tractament_id AS "area_tractament_id", 
+      CASE WHEN at.codi IS NOT NULL THEN 'ATE ' || z.codi || '.' || at.codi ELSE NULL END AS "codi_area", 
+      a.tipus_carrer_id AS "tipus_carrer_id"
+    FROM ecpu_adreca a 
+    JOIN ecpu_tipus_carrer tc ON a.tipus_carrer_id = tc.id 
+    JOIN ecpu_zona z ON a.zona_id = z.id 
+    LEFT JOIN ecpu_area_tractament at ON a.area_tractament_id = at.id`,
+    [],
+    { outFormat: oracledb.OUT_FORMAT_OBJECT }
+  );
 
-    // Si no hi ha resultats, retornem un error 404
     if (result.rows.length === 0) {
-      return res.status(404).send('No s\'han trobat adreces');
+      return res.status(404).send("No s'han trobat adreces");
     }
 
-    // Retornem les dades de les adreces
-    res.status(200).json(result.rows);
+    const imatgeBasePath = path.resolve(process.env.IMATGE_RUTA || '.');
+    const imatgeBaseUrl = process.env.IMATGE_RUTA_SERVIDOR;
+    const extensions = ['.jpg', '.jpeg', '.png'];
+
+    const dades = result.rows.map(adreca => {
+      let imatge = null;
+
+      for (const ext of extensions) {
+        const domcodPath = path.join(imatgeBasePath, `${adreca.DOMCOD}${ext}`);
+        const nucliCodPad = String(adreca.nucli_cod).padStart(9, '0');
+        const nucliPath = path.join(imatgeBasePath, `${nucliCodPad}${ext}`);
+
+        if (fs.existsSync(domcodPath)) {
+          imatge = `${imatgeBaseUrl}/${adreca.DOMCOD}.jpg`;
+          break;
+        } else if (fs.existsSync(nucliPath)) {
+          imatge = `${imatgeBaseUrl}/${nucliCodPad}.jpg`;
+          break;
+        }
+      }
+
+      return {
+        ...adreca,
+        imatge,
+      };
+    });
+        
+    res.status(200).json(dades);
   } catch (error) {
     console.error('❌ Error obtenint les adreces:', error);
     res.status(500).send('❌ Error en obtenir les adreces');
