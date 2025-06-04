@@ -103,8 +103,15 @@ const pdfConsulta = async (req, res) => {
     if (isOlot)
       await inserirVista(connection, fila.COORD_X, fila.COORD_Y, consultaId);
 
-    // Aquí generem el PDF i l’enviem
-    await generarPDF(isConsultaValida(activitat, connection, adreca), activitat, adreca, res);
+    const { buffer } = await generarPDF(isConsultaValida(activitat, connection, adreca), activitat, adreca);
+
+    // ✅ Enviar directament el PDF com a resposta binària
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename="informe_final.pdf"',
+    });
+
+    res.send(buffer);
 
   } catch (error) {
     console.error('❌ Error creant la consulta:', error);
@@ -194,6 +201,7 @@ const consultaActivitat = async (req, res) => {
     if (activitat.is_altres) {
       // Enviar correu a consorci
     } else {
+
       let is_apte = await isConsultaValida(activitat, connection, adreca);
 
       const result = await connection.execute(
@@ -296,6 +304,7 @@ async function isConsultaValida(activitat, connection, adreca) {
 }
 
 async function inserirVista(connection, coord_x, coord_y, consulta_id) {
+
   // Validació: assegura que coord_x i coord_y són números
   if (isNaN(coord_x) || isNaN(coord_y)) {
     throw new Error(`Coordenades no vàlides: coord_x = ${coord_x}, coord_y = ${coord_y}`);
@@ -414,7 +423,7 @@ function generarPDF(is_apte, activitat, adreca) {
       if (is_apte) {
         motiu = '';
       } else {
-      doc.text('\n', { align: 'left' });
+        doc.text('\n', { align: 'left' });
 
         switch (activitat.id_condicio) {
           case 4:
@@ -464,19 +473,19 @@ function generarPDF(is_apte, activitat, adreca) {
       // Paràgraf 2
       if (!(activitat.id_condicio == 1 || activitat.id_condicio == 2 || activitat.id_condicio == 3) && is_apte) {
         doc.text('Si vols crear una reserva d’aquest local amb la teva activitat, has d’enviar un correu a SIGMA a la següent adreça aculebras@consorcisigma.org adjuntant el teu informe final generat pel visor del Pla d’Usos i demanant la teva reserva, la qual tindrà una durada de 15 dies.', { align: 'left' });
-        
+
         doc.font('Helvetica-Bold')
-        .fontSize(10)
-        .fillColor('black')
-        .text('IMPORTANT: ', { continued: true })  // continua a la mateixa línia
-        
+          .fontSize(10)
+          .fillColor('black')
+          .text('IMPORTANT: ', { continued: true })  // continua a la mateixa línia
+
         doc.font('Helvetica')
-        .fillColor('black')
-        .text('si durant aquest període de 15 dies SIGMA no rep la teva tramitació de documentació per gestionar la llicència d’activitat, la teva reserva s’anul·larà.', {
-          align: 'left'
-        });
+          .fillColor('black')
+          .text('si durant aquest període de 15 dies SIGMA no rep la teva tramitació de documentació per gestionar la llicència d’activitat, la teva reserva s’anul·larà.', {
+            align: 'left'
+          });
       }
-      
+
       doc.text('\n', { align: 'left' });
 
       // Paràgraf 3
@@ -799,7 +808,6 @@ const addActivitat = async (req, res) => {
     if (connection) await connection.close();
   }
 };
-
 
 module.exports = {
   getActivitats,
