@@ -103,7 +103,7 @@ const pdfConsulta = async (req, res) => {
     if (isOlot)
       await inserirVista(connection, fila.COORD_X, fila.COORD_Y, consultaId);
 
-    const { buffer } = await generarPDF(isConsultaValida(activitat, connection, adreca), activitat, adreca);
+    const  buffer  = await generarPDF(isConsultaValida(activitat, connection, adreca), activitat, adreca);
 
     // ✅ Enviar directament el PDF com a resposta binària
     res.set({
