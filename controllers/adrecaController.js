@@ -8,6 +8,9 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
+const imatgeBasePath = path.resolve(process.env.IMATGE_RUTA || '.');
+const imatgeBaseUrl = process.env.IMATGE_RUTA_SERVIDOR;
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, process.env.IMATGE_RUTA); // carpeta on es desen les imatges
@@ -107,6 +110,18 @@ const uploadAdreces = async (req, res) => {
   }
 };
 
+function trobarImatge(nomBase) {
+  const extensions = ['.jpg', '.jpeg', '.png', '.webp'];
+  for (const ext of extensions) {
+    const fitxer = nomBase + ext;
+    const ruta = path.join(imatgeBasePath, fitxer);
+    if (fs.existsSync(ruta)) {
+      return `${imatgeBaseUrl}/${fitxer}`;
+    }
+  }
+  return null;
+}
+
 const getAdreces = async (req, res) => {
   let connection;
   try {
@@ -134,33 +149,20 @@ const getAdreces = async (req, res) => {
       return res.status(404).send("No s'han trobat adreces");
     }
 
-    const imatgeBasePath = path.resolve(process.env.IMATGE_RUTA || '.');
-    const imatgeBaseUrl = process.env.IMATGE_RUTA_SERVIDOR;
-    const extensions = ['.jpg', '.jpeg', '.png'];
-
     const dades = result.rows.map(adreca => {
-      let imatge = null;
+      let imatge = trobarImatge(String(adreca.DOMCOD));
 
-      for (const ext of extensions) {
-        const domcodPath = path.join(imatgeBasePath, `${adreca.DOMCOD}${ext}`);
-        const nucliCodPad = String(adreca.nucli_cod).padStart(9, '0');
-        const nucliPath = path.join(imatgeBasePath, `${nucliCodPad}${ext}`);
-
-        if (fs.existsSync(domcodPath)) {
-          imatge = `${imatgeBaseUrl}/${adreca.DOMCOD}.jpg`;
-          break;
-        } else if (fs.existsSync(nucliPath)) {
-          imatge = `${imatgeBaseUrl}/${nucliCodPad}.jpg`;
-          break;
-        }
+      if (!imatge) {
+          const nucliCodPadded = String(adreca.nucli_cod).padStart(9, '0');
+          imatge = trobarImatge(nucliCodPadded);
       }
 
       return {
         ...adreca,
-        imatge,
+        imatge
       };
     });
-        
+          
     res.status(200).json(dades);
   } catch (error) {
     console.error('❌ Error obtenint les adreces:', error);
@@ -214,24 +216,6 @@ const actualitzarAdreca = async (req, res) => {
       amplada_carrer,
       domcod
     });
-
-    // Inserir o actualitzar la imatge, si es proporciona
-    if (imatgeRuta) {
-      const mergeQuery = `
-        MERGE INTO ECPU_ADRECA_IMATGE img
-        USING (SELECT :domcod AS DOMCOD FROM DUAL) d
-        ON (img.DOMCOD = d.DOMCOD)
-        WHEN MATCHED THEN
-          UPDATE SET img.IMATGE = :imatge
-        WHEN NOT MATCHED THEN
-          INSERT (DOMCOD, IMATGE) VALUES (:domcod, :imatge)
-      `;
-
-      await connection.execute(mergeQuery, {
-        domcod,
-        imatge: process.env.IMATGE_RUTA_SERVIDOR + domcod + '.png'
-      });
-    }
 
     await connection.commit();
 
