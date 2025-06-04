@@ -223,8 +223,6 @@ const actualitzarAdreca = async (req, res) => {
 };
 
 
-
-
 module.exports = {
   getAdreces,
   uploadAdreces,

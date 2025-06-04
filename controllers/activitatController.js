@@ -93,8 +93,8 @@ const pdfConsulta = async (req, res) => {
 
     const adreca = {
       DOMCOD: fila.DOMCOD,
-      coord_x: fila.COORD_X,
-      coord_y: fila.COORD_Y,
+      coord_x: Math.trunc(fila.COORD_X),
+      coord_y: Math.trunc(fila.COORD_Y),
       adreca: fila.adreca,
       aplada_carrer: fila.AMPLADA_CARRER,
       pis: fila.PIS
@@ -197,6 +197,9 @@ const consultaActivitat = async (req, res) => {
     const usuari = dades.usuari;
     const adreca = dades.adreca;
     const activitat = dades.activitat;
+
+    adreca.coord_x = Math.trunc(adreca.coord_x);
+    adreca.coord_y = Math.trunc(adreca.coord_y);
 
     if (activitat.is_altres) {
       // Enviar correu a consorci
@@ -357,7 +360,6 @@ function generarPDF(is_apte, activitat, adreca) {
     else
       mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}`;
 
-
     try {
       // Lançar el navegador i carregar la pàgina
       const browser = await puppeteer.launch();
@@ -369,7 +371,7 @@ function generarPDF(is_apte, activitat, adreca) {
       await page.waitForSelector('#map', { visible: true });
 
       // Afegir pausa per assegurar que desapareixen capes temporals
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Captura només de la zona del mapa
       const screenshotPath = path.join(os.tmpdir(), 'mapa_temp.png');
