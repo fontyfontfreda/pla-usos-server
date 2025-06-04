@@ -230,8 +230,12 @@ const consultaActivitat = async (req, res) => {
         return res.status(404).send('No s\'ha pogut crear la consulta');
       }
 
-      // Aquí generem el PDF i l'enviem en la resposta HTTP
-      await generarPDF(is_apte, activitat, adreca, res);
+      const pdfBuffer = await generarPDF(is_apte, activitat, adreca);
+
+      res.json({
+        is_apte,
+        pdf: pdfBuffer.toString('base64')
+      });
 
       // Un cop generat el PDF, retornem la resposta
     }
@@ -329,7 +333,7 @@ async function inserirVista(connection, coord_x, coord_y, consulta_id) {
   await connection.execute(sql, [], { autoCommit: true });
 }
 
-function generarPDF(is_apte, activitat, adreca, res) {
+function generarPDF(is_apte, activitat, adreca) {
   return new Promise(async (resolve, reject) => {
     let mapaUrl = '';
 
@@ -361,15 +365,14 @@ function generarPDF(is_apte, activitat, adreca, res) {
 
       await browser.close();
 
-      // Crear un nou document PDF
+      // Crear PDF i recollir-lo com a Buffer
       const doc = new PDFDocument();
-
-      // Configura el tipus de contingut i el nom del fitxer PDF
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'inline; filename="informe_final.pdf"');
-
-      // El fitxer PDF es genera directament en la resposta
-      doc.pipe(res);
+      const buffers = [];
+      doc.on('data', buffers.push.bind(buffers));
+      doc.on('end', () => {
+        const pdfBuffer = Buffer.concat(buffers);
+        resolve(pdfBuffer);
+      });
 
       // Contingut del PDF
       doc.font('Helvetica-Bold')
@@ -406,12 +409,13 @@ function generarPDF(is_apte, activitat, adreca, res) {
       doc.font('Helvetica-Bold')
         .fontSize(12)
         .text(titolInformacioPDF(is_apte, activitat.id_condicio), { align: 'center' });
-      doc.moveDown(2);
 
       let motiu;
       if (is_apte) {
         motiu = '';
       } else {
+      doc.text('\n', { align: 'left' });
+
         switch (activitat.id_condicio) {
           case 4:
             motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 50 metres.';
@@ -458,16 +462,39 @@ function generarPDF(is_apte, activitat, adreca, res) {
       }
 
       // Paràgraf 2
+      if (!(activitat.id_condicio == 1 || activitat.id_condicio == 2 || activitat.id_condicio == 3) && is_apte) {
+        doc.text('Si vols crear una reserva d’aquest local amb la teva activitat, has d’enviar un correu a SIGMA a la següent adreça aculebras@consorcisigma.org adjuntant el teu informe final generat pel visor del Pla d’Usos i demanant la teva reserva, la qual tindrà una durada de 15 dies.', { align: 'left' });
+        
+        doc.font('Helvetica-Bold')
+        .fontSize(10)
+        .fillColor('black')
+        .text('IMPORTANT: ', { continued: true })  // continua a la mateixa línia
+        
+        doc.font('Helvetica')
+        .fillColor('black')
+        .text('si durant aquest període de 15 dies SIGMA no rep la teva tramitació de documentació per gestionar la llicència d’activitat, la teva reserva s’anul·larà.', {
+          align: 'left'
+        });
+      }
+      
+      doc.text('\n', { align: 'left' });
+
+      // Paràgraf 3
       if (activitat.id_condicio != 1 && is_apte) {
         if (activitat.id_condicio == 2 || activitat.id_condicio == 3)
           doc.text('Aquest document s’ha d’entregar al SIGMA (Consorci de Medi Ambient i Salut Pública) i té una vigència d’un mes.', { align: 'left' });
         else
-          doc.text('Aquest document té una vigència d’un mes.', { align: 'left' });
+          doc.fontSize(8).text('Aquest document té una vigència d’un mes.', { align: 'left' });
         doc.moveDown();
       }
 
-      // Paràgraf 3
-      doc.text('Document sense valor normatiu, vàlid només a efectes informatius.', { align: 'left' });
+      // Paràgraf 4
+      doc.fontSize(8).text('Document sense valor normatiu, vàlid només a efectes informatius.', { align: 'left' });
+
+      doc.text('\n', { align: 'left' });
+
+      // Paràgraf 5
+      doc.fontSize(8).text('Aquest informe no indica si en aquest local ja hi ha una activitat existent i tampoc es contemplen variacions de domicilis.', { align: 'left' });
 
       doc.end();
 
