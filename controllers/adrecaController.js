@@ -129,8 +129,7 @@ const getAdreces = async (req, res) => {
    const result = await connection.execute(
     `SELECT a.DOMCOD, 
       a.ADRECA AS "adreca",
-      a.nucli_cod AS "nucli_cod", a.codi_carrer AS "codi_carrer", a.carrer AS "carrer", a.numero AS "numero", a.bis AS "bis", a.pis AS "pis", a.porta AS "porta", 
-      a.tipus_dom AS "tipus_dom", a.tipus_loc AS "tipus_loc", a.amplada_carrer AS "amplada_carrer", a.coord_x AS "coord_x", a.coord_y AS "coord_y", a.zona_id AS "zona_id", 
+      a.nucli_cod AS "nucli_cod", a.pis AS "pis", a.tipus_dom AS "tipus_dom", a.tipus_loc AS "tipus_loc", a.amplada_carrer AS "amplada_carrer", a.coord_x AS "coord_x", a.coord_y AS "coord_y", a.zona_id AS "zona_id", 
       'ZR-' || z.codi AS "codi_zona", 
       a.area_tractament_id AS "area_tractament_id", 
       CASE WHEN at.codi IS NOT NULL THEN 'ATE ' || z.codi || '.' || at.codi ELSE NULL END AS "codi_area"
