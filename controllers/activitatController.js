@@ -64,13 +64,10 @@ const pdfConsulta = async (req, res) => {
 
     connection = await db();
     const result = await connection.execute(
-      `SELECT c.CONDICIO_ID, c.VALOR_CONDICIO, c.DOMCOD, c.GRUP_DESCRIPCIO, c.SUBGRUP_DESCRIPCIO, d.descripcio AS "ACTIVITAT_DESCRIPCIO", c.COORD_X, c.COORD_Y, tc.descripcio || ' ' || a.carrer || ' Núm. ' || a.numero || 
-        CASE WHEN a.pis IS NOT NULL THEN ' Pis ' || a.pis ELSE '' END || 
-        CASE WHEN a.porta IS NOT NULL THEN ' Pta. ' || a.porta ELSE '' END AS "adreca", a.AMPLADA_CARRER, a.PIS
+      `SELECT c.CONDICIO_ID, c.VALOR_CONDICIO, c.DOMCOD, c.GRUP_DESCRIPCIO, c.SUBGRUP_DESCRIPCIO, d.descripcio AS "ACTIVITAT_DESCRIPCIO", c.COORD_X, c.COORD_Y, a.ADRECA AS "adreca", a.AMPLADA_CARRER, a.PIS
         FROM ECPU_CONSULTA c
         JOIN ecpu_descripcio_activitat d ON d.id = c.activitat_id
         JOIN ecpu_adreca a ON a.DOMCOD = c.DOMCOD
-        JOIN ecpu_tipus_carrer tc ON a.tipus_carrer_id = tc.id 
         WHERE c.ID = :id`,
       [consultaId],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }

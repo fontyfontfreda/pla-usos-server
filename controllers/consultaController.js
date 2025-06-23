@@ -11,9 +11,7 @@ const getConsultes = async (req, res) => {
           c.DNI_INTERESSAT AS  "dni_interessat",
           c.NOM_INTERESSAT AS  "nom_interessat",
           c. ACTUACIO_INTERESSAT AS "actuacio_interessat",
-          tc.descripcio || ' ' || a.carrer || ' Núm. ' || a.numero || 
-                  CASE WHEN a.pis IS NOT NULL THEN ' Pis ' || a.pis ELSE '' END || 
-                  CASE WHEN a.porta IS NOT NULL THEN ' Pta. ' || a.porta ELSE '' END AS "adreca",
+          a.ADRECA AS "adreca",
           c.IS_ALTRES AS "is_altres",
           g.descripcio AS "grup",
           s.descripcio AS "subgrup",
@@ -25,7 +23,6 @@ const getConsultes = async (req, res) => {
           to_char(c.created_at, 'dd-mm-yyyy') AS "data"
           FROM ecpu_consulta c
           JOIN ecpu_adreca a ON a.DOMCOD = c.DOMCOD
-          JOIN ecpu_tipus_carrer tc ON a.tipus_carrer_id = tc.id
           LEFT JOIN ecpu_grup_activitat g ON g.codi = c.GRUP_ID
           LEFT JOIN ecpu_subgrup_activitat s ON s.id = c.subgrup_id
           LEFT JOIN ecpu_descripcio_activitat ac ON ac.id = c.activitat_id
