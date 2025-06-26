@@ -67,7 +67,7 @@ const pdfConsulta = async (req, res) => {
       `SELECT c.CONDICIO_ID, c.VALOR_CONDICIO, c.DOMCOD, c.GRUP_DESCRIPCIO, c.SUBGRUP_DESCRIPCIO, d.descripcio AS "ACTIVITAT_DESCRIPCIO", c.COORD_X, c.COORD_Y, a.ADRECA AS "adreca", a.AMPLADA_CARRER, a.PIS
         FROM ECPU_CONSULTA c
         JOIN ecpu_descripcio_activitat d ON d.id = c.activitat_id
-        JOIN ecpu_adreca a ON a.DOMCOD = c.DOMCOD
+        LEFT JOIN ecpu_adreca a ON a.DOMCOD = c.DOMCOD
         WHERE c.ID = :id`,
       [consultaId],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
@@ -402,7 +402,7 @@ function generarPDF(is_apte, activitat, adreca) {
       doc.moveDown();
 
       // Adreça i activitat
-      doc.text(`- ${adreca.adreca} (${adreca.DOMCOD}) OLOT`);
+      doc.text(`- ${adreca.adreca ? adreca.adreca : "Adreça no disponible"} (${adreca.DOMCOD}) OLOT`);
       doc.moveDown();
       doc.text(`- Tipus d'activitat: ${activitat.descripcio_grup}`);
       doc.text(`- Sector: ${activitat.descripcio_subgrup}`);

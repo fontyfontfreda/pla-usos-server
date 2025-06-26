@@ -22,7 +22,7 @@ const getConsultes = async (req, res) => {
           c.valor_condicio AS "valor_condicio",
           to_char(c.created_at, 'dd-mm-yyyy') AS "data"
           FROM ecpu_consulta c
-          JOIN ecpu_adreca a ON a.DOMCOD = c.DOMCOD
+          LEFT JOIN ecpu_adreca a ON a.DOMCOD = c.DOMCOD
           LEFT JOIN ecpu_grup_activitat g ON g.codi = c.GRUP_ID
           LEFT JOIN ecpu_subgrup_activitat s ON s.id = c.subgrup_id
           LEFT JOIN ecpu_descripcio_activitat ac ON ac.id = c.activitat_id
