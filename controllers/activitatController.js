@@ -8,6 +8,8 @@ const path = require('path');
 
 const isOlot = process.env.IS_OLOT === 'true';
 
+let has_aplada_carrer = true;
+
 const getAllActivitats = async (req, res) => {
   let connection;
   try {
@@ -289,7 +291,12 @@ async function isConsultaValida(activitat, connection, adreca) {
       break;
     case 7:
       // amplaria carrer
-      is_apte = adreca.amplada_carrer >= activitat.valor_condicio;
+      if (adreca.amplada_carrer == null || adreca.amplada_carrer == undefined) {
+        is_apte = false;
+        has_aplada_carrer = false;
+      } else {
+        is_apte = adreca.amplada_carrer >= activitat.valor_condicio;
+      }
       break;
     case 8:
       is_apte = true;
@@ -417,6 +424,19 @@ function generarPDF(is_apte, activitat, adreca) {
       });
       doc.moveDown(2);
 
+      if (!has_aplada_carrer) {
+        doc.font('Helvetica')
+          .fontSize(10)
+          .fillColor('red')
+          .text('ALERTA: ', { continued: true })  // continua a la mateixa línia
+
+        doc.fillColor('black')
+          .text('No es disposa de l\'amplada d\'aquest carrer. Posis en contacte enviant un correu a SIGMA a la següent adreça aculebras@consorcisigma.org per més informació.', {
+            align: 'left'
+          });
+
+        doc.moveDown();
+      }else {
       // Informació
       doc.font('Helvetica-Bold')
         .fontSize(12)
@@ -507,7 +527,7 @@ function generarPDF(is_apte, activitat, adreca) {
 
       // Paràgraf 5
       doc.fontSize(8).text('Aquest informe no indica si en aquest local ja hi ha una activitat existent i tampoc es contemplen variacions de domicilis.', { align: 'left' });
-
+      }
       doc.end();
 
       doc.on('finish', () => {

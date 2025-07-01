@@ -8,6 +8,7 @@ const getConsultes = async (req, res) => {
   
       const result = await connection.execute(
         `SELECT c.ID AS "id",
+          c.DOMCOD AS "DOMCOD",
           c.DNI_INTERESSAT AS  "dni_interessat",
           c.NOM_INTERESSAT AS  "nom_interessat",
           c. ACTUACIO_INTERESSAT AS "actuacio_interessat",
