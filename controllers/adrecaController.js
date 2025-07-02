@@ -72,8 +72,8 @@ const uploadAdreces = async (req, res) => {
 
           await connection.execute(
             `INSERT INTO ecpu_adreca 
-              (DOMCOD, carrer, numero, bis, pis, porta, tipus_dom, tipus_loc, tipus_carrer_id, zona_id, area_tractament_id, coord_x, coord_y, amplada_carrer, codi_carrer, nucli_cod) 
-              VALUES (:DOMCOD, :carrer, :numero, :bis, :pis, :porta, :tipus_dom, :tipus_loc, :tipus_carrer_id, :zona_id, :area_tractament_id, :coord_x, :coord_y, :amplada_carrer, :codi_carrer, :nucli_cod)`,
+              (DOMCOD, carrer, numero, bis, pis, porta, tipus_dom, tipus_loc, tipus_carrer_id, zona_id, area_tractament_id, coord_x, coord_y, amplada_carrer, codi_carrer, NUCLICOD) 
+              VALUES (:DOMCOD, :carrer, :numero, :bis, :pis, :porta, :tipus_dom, :tipus_loc, :tipus_carrer_id, :zona_id, :area_tractament_id, :coord_x, :coord_y, :amplada_carrer, :codi_carrer, :NUCLICOD)`,
             {
               DOMCOD: row['DOMCOD'],
               carrer: row['CARDESC'],
@@ -90,7 +90,7 @@ const uploadAdreces = async (req, res) => {
               coord_y: row['Coord_Y'],
               amplada_carrer: row['AMPLE_CARRER'],
               codi_carrer: row['CODICAR'],
-              nucli_cod: row['NUCLICOD']
+              NUCLICOD: row['NUCLICOD']
             },
             { autoCommit: true }
           );
@@ -129,7 +129,7 @@ const getAdreces = async (req, res) => {
    const result = await connection.execute(
     `SELECT a.DOMCOD, 
       a.ADRECA AS "adreca",
-      a.nucli_cod AS "nucli_cod", a.pis AS "pis", a.tipus_dom AS "tipus_dom", a.tipus_loc AS "tipus_loc", a.amplada_carrer AS "amplada_carrer", a.coord_x AS "coord_x", a.coord_y AS "coord_y", a.zona_id AS "zona_id", 
+      a.NUCLICOD AS "NUCLICOD", a.pis AS "pis", a.tipus_dom AS "tipus_dom", a.tipus_loc AS "tipus_loc", a.amplada_carrer AS "amplada_carrer", a.coord_x AS "coord_x", a.coord_y AS "coord_y", a.zona_id AS "zona_id", 
       'ZR-' || z.codi AS "codi_zona", 
       a.area_tractament_id AS "area_tractament_id", 
       CASE WHEN at.codi IS NOT NULL THEN 'ATE ' || z.codi || '.' || at.codi ELSE NULL END AS "codi_area"
@@ -148,7 +148,7 @@ const getAdreces = async (req, res) => {
       let imatge = trobarImatge(String(adreca.DOMCOD));
 
       if (!imatge) {
-          const nucliCodPadded = String(adreca.nucli_cod).padStart(9, '0');
+          const nucliCodPadded = String(adreca.NUCLICOD).padStart(9, '0');
           imatge = trobarImatge(nucliCodPadded);
       }
 
