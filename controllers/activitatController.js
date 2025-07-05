@@ -146,11 +146,12 @@ const getActivitats = async (req, res) => {
                   sa.descripcio AS "descripcio_subgrup", da.id AS "codi_descripcio_activitat", 
                   da.descripcio AS "descripcio_descripcio_activitat", c.id AS "id_condicio", 
                   zac.valor AS "valor_condicio", c.descripcio AS "condicio"
-           FROM ecpu_zona_activitat_condicio zac 
-           INNER JOIN ecpu_condicio c ON zac.condicio_id = c.id 
-           INNER JOIN ecpu_descripcio_activitat da ON zac.descripcio_activitat_id = da.id 
-           INNER JOIN ecpu_subgrup_activitat sa ON da.id_subgrup_activitat = sa.id 
-           INNER JOIN ecpu_grup_activitat ga ON sa.codi_grup_activitat = ga.codi 
+           FROM ecpu_zona_activitat_condicio_test zac 
+           JOIN ecpu_condicio c ON zac.condicio_id = c.id 
+           JOIN ecpu_epigraf e ON e.id = zac.epigraf_id
+           JOIN ecpu_descripcio_activitat_test da ON da.id_epigraf = e.id
+           JOIN ecpu_subgrup_activitat_test sa ON da.id_subgrup_activitat = sa.id 
+           JOIN ecpu_grup_activitat_test ga ON sa.codi_grup_activitat = ga.codi 
            WHERE zona_id = :zona_id`,
           [result.rows[0].ZONA_ID],
           { outFormat: oracledb.OUT_FORMAT_OBJECT }
@@ -164,11 +165,12 @@ const getActivitats = async (req, res) => {
                   sa.descripcio AS "descripcio_subgrup", da.id AS "codi_descripcio_activitat", 
                   da.descripcio AS "descripcio_descripcio_activitat", c.id AS "id_condicio", 
                   aac.valor AS "valor_condicio", c.descripcio AS "condicio" 
-           FROM ecpu_area_activitat_condicio aac 
+           FROM ecpu_area_activitat_condicio_test aac 
            JOIN ecpu_condicio c ON aac.condicio_id = c.id 
-           JOIN ecpu_descripcio_activitat da ON aac.descripcio_activitat_id = da.id 
-           JOIN ecpu_subgrup_activitat sa ON da.id_subgrup_activitat = sa.id 
-           JOIN ecpu_grup_activitat ga ON sa.codi_grup_activitat = ga.codi 
+           JOIN ecpu_epigraf e ON e.id = aac.epigraf_id
+           JOIN ecpu_descripcio_activitat_test da ON da.id_epigraf = e.id
+           JOIN ecpu_subgrup_activitat_test sa ON da.id_subgrup_activitat = sa.id 
+           JOIN ecpu_grup_activitat_test ga ON sa.codi_grup_activitat = ga.codi 
            WHERE aac.area_id = :area_id`,
           [result.rows[0].AREA_TRACTAMENT_ID],
           { outFormat: oracledb.OUT_FORMAT_OBJECT }
