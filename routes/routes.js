@@ -40,6 +40,7 @@ router.put('/adreces/:domcod', upload.single('imatge'), adrecaController.actuali
 //CONDICIONS
 router.post('/upload-epigrafs', upload.single('file'), condicioController.processEpigrafUpload);
 router.post('/upload-condicions', upload.single('file'), condicioController.processCondicionsUpload);
+router.get('/epigrafs', condicioController.getEpigrafs);
 
 //ZONES/ÀREES
 router.post('/zones/zona', zonaController.createZona);

@@ -276,9 +276,35 @@ const processEpigrafUpload = async (req, res) => {
   }
 };
 
+const getEpigrafs = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+
+    const epigrafs = await connection.execute(
+      `SELECT ID as "id", CODI1 as "codi1", CODI2 as "codi2", CODI3 as "codi3", DESCRIPCIO as "descripcio", MOSTRAR as "mostrar"
+       FROM ecpu_epigraf
+       ORDER BY CODI1, CODI2, CODI3`,
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    if (epigrafs.rows.length === 0) {
+      return res.status(404).send('No s\'ha trobat cap epigraf');
+    }
+
+    res.status(200).json(epigrafs.rows);
+  } catch (error) {
+    console.error('❌ Error obtenint els epigrafs:', error);
+    res.status(500).send('❌ Error en obtenir els epigrafs');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
 
 
 module.exports = {
   processCondicionsUpload,
-  processEpigrafUpload
+  processEpigrafUpload,
+  getEpigrafs
 };
