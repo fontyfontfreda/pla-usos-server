@@ -38,8 +38,8 @@ router.post('/uploadAdreces', upload.single('file'), adrecaController.uploadAdre
 router.put('/adreces/:domcod', upload.single('imatge'), adrecaController.actualitzarAdreca);
 
 //CONDICIONS
-router.post('/upload', upload.single('file'), condicioController.processUpload);
 router.post('/upload-epigrafs', upload.single('file'), condicioController.processEpigrafUpload);
+router.post('/upload-condicions', upload.single('file'), condicioController.processCondicionsUpload);
 
 //ZONES/ÀREES
 router.post('/zones/zona', zonaController.createZona);

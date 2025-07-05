@@ -2,7 +2,7 @@ const db = require('../models/db');
 const oracledb = require('oracledb');
 const xlsx = require('xlsx');
 
-const processUpload = async (req, res) => {
+const processCondicionsUpload = async (req, res) => {
   let connection;
   try {
     if (!req.file) {
@@ -15,93 +15,131 @@ const processUpload = async (req, res) => {
 
     connection = await db();
 
-    for (const row of data) {
-      if (!row || row.length < 4 || !row[0]) continue; 
+    let zonaActCondId = 1;
+    let areaActCondId = 1;
 
-      const codiParts = row[0].toString().split('.');
+    for (const [i, row] of data.entries()) {
+      if (i === 0) continue; // Salta la fila de capçaleres
 
-      let idDescripcioActivitat = null;
+      const EPIGRAF_PEU = row[0]?.toString().trim();
+      const Z1 = row[1]?.toString().trim();
+      const A11 = row[2]?.toString().trim();
+      const A12 = row[3]?.toString().trim();
+      const A13 = row[4]?.toString().trim();
+      const A14 = row[5]?.toString().trim();
+      const A15 = row[6]?.toString().trim();
+      const A16 = row[7]?.toString().trim();
+      const Z2 = row[8]?.toString().trim();
+      const A21 = row[9]?.toString().trim();
+      const Z3 = row[10]?.toString().trim();
+      const Z4 = row[11]?.toString().trim();
 
-      const result = await connection.execute(
-        `SELECT da.id 
-         FROM ecpu_grup_activitat ga
-         JOIN ecpu_subgrup_activitat sa ON ga.codi = sa.codi_grup_activitat
-         JOIN ecpu_descripcio_activitat da ON sa.id = da.id_subgrup_activitat
-         WHERE ga.codi = :grupCodi AND sa.codi = :subgrupCodi AND da.codi = :descripcioCodi`,
-        {
-          grupCodi: codiParts[0],
-          subgrupCodi: codiParts[1],
-          descripcioCodi: codiParts[2]
-        },
+      if (!EPIGRAF_PEU || !Z1 || !A11 || !A12 || !A13 || !A14 || !A15 || !A16 || !Z2 || !A21 || !Z3 || !Z4) continue;
+
+      const [CODI1, CODI2, CODI3] = EPIGRAF_PEU.split('.');
+
+      // Busca ID de l'epígraf
+      const epigrafResult = await connection.execute(
+        `SELECT ID FROM ECPU_EPIGRAF 
+         WHERE CODI1 = :c1 AND CODI2 = :c2 AND CODI3 = :c3`,
+        { c1: CODI1, c2: CODI2, c3: CODI3 },
         { outFormat: oracledb.OUT_FORMAT_OBJECT }
       );
 
-      idDescripcioActivitat = result.rows[0]?.ID;
+      const ID_EPIGRAF = epigrafResult.rows[0]?.ID;
+      if (!ID_EPIGRAF) continue;
 
-      if (idDescripcioActivitat) {
-        for (let index = 2; index <= 12; index++) {
-          const condicions = row[index].toString().split('-');
-          for (const condicio of condicions) {
-            let condicioId = condicio.replace(/\s+/g, "");
-            let valor = "";
-            
-            if (condicioId.length > 3) {
-              const match = condicioId.match(/(\d+)\((\d+)\)/);
-              if (match) {
-                condicioId = match[1];
-                valor = match[2];
+      //-------------ZONES-------------
+      const zones = [Z1, Z2, Z3, Z4];
+
+      for (let i = 0; i < zones.length; i++) {
+        const zona = zones[i];
+        if (!zona) continue;
+
+        const condicions = zona.split(' - ');
+
+        for (const condicio of condicions) {
+          let condicioID = null;
+          let valor = null;
+
+          const regex = /^(\d+)(?:\((\d+)\))?$/;
+          const match = condicio.trim().match(regex);
+
+          if (match) {
+            condicioID = parseInt(match[1], 10);
+            valor = match[2] ? parseInt(match[2], 10) : null;
+          } else {
+            console.error(`⚠️ Format de condició no vàlid: '${condicio}'`);
+            continue;
+          }
+
+          try {
+            await connection.execute(
+              `INSERT INTO ECPU_ZONA_ACTIVITAT_CONDICIO_TEST (ID, ZONA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR)
+         VALUES (:id, :zona, :epigraf, :condicio, :valor)`,
+              {
+                id: zonaActCondId,
+                zona: i + 1,
+                epigraf: ID_EPIGRAF,
+                condicio: condicioID,
+                valor: valor
               }
-            }
-
-            const zones = {
-              2: 1,
-              9: 2,
-              11: 3,
-              12: 4
-            };
-
-            const arees = {
-              3: 1,
-              4: 2,
-              5: 3,
-              6: 4,
-              7: 5,
-              8: 6,
-              10: 7
-            };
-
-            if (index == 2 || index == 9 || index == 11 || index == 12) {
-              await connection.execute(
-                `INSERT INTO ecpu_zona_activitat_condicio (zona_id, descripcio_activitat_id, condicio_id, valor)
-                 VALUES (:zona_id, :descripcio_activitat_id, :condicio_id, :valor)`,
-                {
-                  zona_id: zones[index],
-                  descripcio_activitat_id: idDescripcioActivitat,
-                  condicio_id: condicioId,
-                  valor: valor || null
-                },
-                { autoCommit: true }
-              );
-            } else {
-              await connection.execute(
-                `INSERT INTO ecpu_area_activitat_condicio (area_id, descripcio_activitat_id, condicio_id, valor)
-                 VALUES (:area_id, :descripcio_activitat_id, :condicio_id, :valor)`,
-                {
-                  area_id: arees[index],
-                  descripcio_activitat_id: idDescripcioActivitat,
-                  condicio_id: condicioId,
-                  valor: valor || null
-                },
-                { autoCommit: true }
-              );
-            }
+            );
+            zonaActCondId++;
+          } catch (e) {
+            console.error("❌ Error a l'INSERT:", e);
           }
         }
       }
+
+      //-------------ÀREES-------------
+      const arees = [A11, A12, A13, A14, A15, A16, A21];
+
+      for (let i = 0; i < arees.length; i++) {
+        const area = arees[i];
+        if (!area) continue;
+
+        const condicions = area.split(' - ');
+
+        for (const condicio of condicions) {
+          let condicioID = null;
+          let valor = null;
+
+          const regex = /^(\d+)(?:\((\d+)\))?$/;
+          const match = condicio.trim().match(regex);
+
+          if (match) {
+            condicioID = parseInt(match[1], 10);
+            valor = match[2] ? parseInt(match[2], 10) : null;
+          } else {
+            console.error(`⚠️ Format de condició no vàlid: '${condicio}'`);
+            continue;
+          }
+
+          try {
+            await connection.execute(
+              `INSERT INTO ECPU_AREA_ACTIVITAT_CONDICIO_TEST (ID, AREA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR)
+         VALUES (:id, :area, :epigraf, :condicio, :valor)`,
+              {
+                id: areaActCondId,
+                area: i + 1,
+                epigraf: ID_EPIGRAF,
+                condicio: condicioID,
+                valor: valor
+              }
+            );
+            areaActCondId++;
+          } catch (e) {
+            console.error("❌ Error a l'INSERT:", e);
+          }
+        }
+      }
+
     }
-    res.send('✅ Dades importades correctament');
+    await connection.commit();
+    res.send('✅ Dades de condicions importades correctament');
   } catch (error) {
-    console.error('❌ Error processant l\'Excel:', error);
+    console.error('❌ Error processant l\'Excel de condicions:', error);
     res.status(500).send('❌ Error en processar el fitxer');
   } finally {
     if (connection) await connection.close();
@@ -225,7 +263,7 @@ const processEpigrafUpload = async (req, res) => {
           created_at: created_at
         }
       );
-    
+
     }
 
     await connection.commit();
@@ -241,6 +279,6 @@ const processEpigrafUpload = async (req, res) => {
 
 
 module.exports = {
-  processUpload,
+  processCondicionsUpload,
   processEpigrafUpload
 };
