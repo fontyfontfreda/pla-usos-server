@@ -152,7 +152,9 @@ const getActivitats = async (req, res) => {
            JOIN ecpu_descripcio_activitat_test da ON da.id_epigraf = e.id
            JOIN ecpu_subgrup_activitat_test sa ON da.id_subgrup_activitat = sa.id 
            JOIN ecpu_grup_activitat_test ga ON sa.codi_grup_activitat = ga.codi 
-           WHERE zona_id = :zona_id`,
+           WHERE zona_id = :zona_id
+           AND e.mostrar = 1
+           AND da.mostrar = 1`,
           [result.rows[0].ZONA_ID],
           { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -171,7 +173,9 @@ const getActivitats = async (req, res) => {
            JOIN ecpu_descripcio_activitat_test da ON da.id_epigraf = e.id
            JOIN ecpu_subgrup_activitat_test sa ON da.id_subgrup_activitat = sa.id 
            JOIN ecpu_grup_activitat_test ga ON sa.codi_grup_activitat = ga.codi 
-           WHERE aac.area_id = :area_id`,
+           WHERE aac.area_id = :area_id
+           AND e.mostrar = 1
+           AND da.mostrar = 1`,
           [result.rows[0].AREA_TRACTAMENT_ID],
           { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -212,7 +216,7 @@ const consultaActivitat = async (req, res) => {
         `BEGIN ECPU_INSERIR_CONSULTA_I_VISTA_BUFFER(
           :DNI_interessat, :nom_interessat, :actuacio_interessat, :DOMCOD,
           :grup_id, :grup_descripcio, :subgrup_id, :subgrup_descripcio,
-          :activitat_id, :condicio_id, :valor_condicio,
+          : , :condicio_id, :valor_condicio,
           :is_altres, :descripcio_altres, :is_valid,
           :coord_x, :coord_y, :insertedId
         ); END;`,
