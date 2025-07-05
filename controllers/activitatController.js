@@ -358,7 +358,7 @@ function generarPDF(is_apte, activitat, adreca) {
     let mapaUrl = '';
 
     if (activitat.id_condicio == 4 || activitat.id_condicio == 5 || activitat.id_condicio == 7)
-      mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos_informe.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}&diam=${activitat.valor_condicio}`;
+      mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos_informe.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}&diam=100`;
     else if (activitat.id_condicio == 6)
       mapaUrl = `https://sig.olot.cat/minimapa/Pla-usos_informe.asp?X=${adreca.coord_x}&Y=${adreca.coord_y}&diam=50`;
     else
@@ -552,6 +552,7 @@ function titolInformacioPDF(is_apte, condicio) {
 
 async function consultaBuffer(connection, activitat, DOMCOD) {
   if (isOlot) {
+    let diametre = (activitat.id_condicio == 4 || activitat.id_condicio == 6) ? 50 : 100;
     const result = await connection.execute(
       `SELECT A.DESCRIPCIO FROM (SELECT * FROM (SELECT COORDGEOCODEPOINT, DOMCOD, ADRECA, ZONA, ATE FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT 
       WHERE ZONA = (SELECT ZONA FROM AIT.USTG_LOC_DETALL_IN_P_USOS_AUT WHERE DOMCOD = :domcod)) dom, (
@@ -564,7 +565,7 @@ async function consultaBuffer(connection, activitat, DOMCOD) {
         domcod: DOMCOD,
         grup: activitat.descripcio_grup,
         subgrup: activitat.descripcio_subgrup,
-        diam: activitat.valor_condicio
+        diam: diametre
       },
       { autoCommit: true }
     );
