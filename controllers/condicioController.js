@@ -75,7 +75,7 @@ const processCondicionsUpload = async (req, res) => {
 
           try {
             await connection.execute(
-              `INSERT INTO ECPU_ZONA_ACTIVITAT_CONDICIO_TEST (ID, ZONA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR)
+              `INSERT INTO ECPU_ZONA_ACTIVITAT_CONDICIO (ID, ZONA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR)
          VALUES (:id, :zona, :epigraf, :condicio, :valor)`,
               {
                 id: zonaActCondId,
@@ -118,7 +118,7 @@ const processCondicionsUpload = async (req, res) => {
 
           try {
             await connection.execute(
-              `INSERT INTO ECPU_AREA_ACTIVITAT_CONDICIO_TEST (ID, AREA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR)
+              `INSERT INTO ECPU_AREA_ACTIVITAT_CONDICIO (ID, AREA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR)
          VALUES (:id, :area, :epigraf, :condicio, :valor)`,
               {
                 id: areaActCondId,
@@ -187,7 +187,7 @@ const processEpigrafUpload = async (req, res) => {
       let codiGrup;
 
       const grupResult = await connection.execute(
-        `SELECT CODI FROM ECPU_GRUP_ACTIVITAT_TEST WHERE DESCRIPCIO = :descripcio`,
+        `SELECT CODI FROM ECPU_GRUP_ACTIVITAT WHERE DESCRIPCIO = :descripcio`,
         { descripcio: GRUP },
         { outFormat: oracledb.OUT_FORMAT_OBJECT }
       );
@@ -196,7 +196,7 @@ const processEpigrafUpload = async (req, res) => {
         codiGrup = grupResult.rows[0].CODI;
       } else {
         const nextCodiResult = await connection.execute(
-          `SELECT NVL(MAX(CODI), 0) + 1 AS NEXT_CODI FROM ECPU_GRUP_ACTIVITAT_TEST`,
+          `SELECT NVL(MAX(CODI), 0) + 1 AS NEXT_CODI FROM ECPU_GRUP_ACTIVITAT`,
           {},
           { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -204,7 +204,7 @@ const processEpigrafUpload = async (req, res) => {
         codiGrup = nextCodiResult.rows[0].NEXT_CODI;
 
         await connection.execute(
-          `INSERT INTO ECPU_GRUP_ACTIVITAT_TEST (CODI, DESCRIPCIO, CREATED_AT)
+          `INSERT INTO ECPU_GRUP_ACTIVITAT (CODI, DESCRIPCIO, CREATED_AT)
            VALUES (:codi, :descripcio, :created_at)`,
           { codi: codiGrup, descripcio: GRUP, created_at: created_at }
         );
@@ -214,7 +214,7 @@ const processEpigrafUpload = async (req, res) => {
       let idSubgrup;
 
       const subgrupResult = await connection.execute(
-        `SELECT ID FROM ECPU_SUBGRUP_ACTIVITAT_TEST 
+        `SELECT ID FROM ECPU_SUBGRUP_ACTIVITAT 
          WHERE DESCRIPCIO = :descripcio AND CODI = :codi`,
         { descripcio: SUBGRUP, codi: CODI2 },
         { outFormat: oracledb.OUT_FORMAT_OBJECT }
@@ -224,7 +224,7 @@ const processEpigrafUpload = async (req, res) => {
         idSubgrup = subgrupResult.rows[0].ID;
       } else {
         const nextIdSubgrupResult = await connection.execute(
-          `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_ID FROM ECPU_SUBGRUP_ACTIVITAT_TEST`,
+          `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_ID FROM ECPU_SUBGRUP_ACTIVITAT`,
           {},
           { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -232,7 +232,7 @@ const processEpigrafUpload = async (req, res) => {
         idSubgrup = nextIdSubgrupResult.rows[0].NEXT_ID;
 
         await connection.execute(
-          `INSERT INTO ECPU_SUBGRUP_ACTIVITAT_TEST (ID, CODI, DESCRIPCIO, CODI_GRUP_ACTIVITAT, CREATED_AT)
+          `INSERT INTO ECPU_SUBGRUP_ACTIVITAT (ID, CODI, DESCRIPCIO, CODI_GRUP_ACTIVITAT, CREATED_AT)
            VALUES (:id, :codi, :descripcio, :grup, :created_at)`,
           { id: idSubgrup, codi: CODI2, descripcio: SUBGRUP, grup: codiGrup, created_at: created_at }
         );
@@ -242,7 +242,7 @@ const processEpigrafUpload = async (req, res) => {
       let idDescripcio;
 
       const nextIdDescripcioResult = await connection.execute(
-        `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_ID FROM ECPU_DESCRIPCIO_ACTIVITAT_TEST`,
+        `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_ID FROM ECPU_DESCRIPCIO_ACTIVITAT`,
         {},
         { outFormat: oracledb.OUT_FORMAT_OBJECT }
       );
@@ -250,7 +250,7 @@ const processEpigrafUpload = async (req, res) => {
       idDescripcio = nextIdDescripcioResult.rows[0].NEXT_ID;
 
       await connection.execute(
-        `INSERT INTO ECPU_DESCRIPCIO_ACTIVITAT_TEST 
+        `INSERT INTO ECPU_DESCRIPCIO_ACTIVITAT 
           (ID, ID_SUBGRUP_ACTIVITAT, CODI, DESCRIPCIO, ID_EPIGRAF, CREATED_AT)
           VALUES (:id, :subgrup, :codi, :descripcio, :epigraf, :created_at)`,
         {
@@ -330,7 +330,7 @@ const getEpigraf = async (req, res) => {
               aac.condicio_id,
               c.descripcio AS condicio, 
               aac.valor
-          FROM ecpu_area_activitat_condicio_test aac
+          FROM ecpu_area_activitat_condicio aac
           JOIN ecpu_epigraf e ON e.id = aac.epigraf_id
           JOIN ecpu_area_tractament at ON at.id = aac.area_id
           JOIN ecpu_zona z ON at.id_zona = z.id
@@ -344,7 +344,7 @@ const getEpigraf = async (req, res) => {
               zac.condicio_id,
               c.descripcio AS condicio, 
               zac.valor
-          FROM ecpu_zona_activitat_condicio_test zac
+          FROM ecpu_zona_activitat_condicio zac
           JOIN ecpu_epigraf e ON e.id = zac.epigraf_id
           JOIN ecpu_zona z ON zac.zona_id = z.id
           JOIN ecpu_condicio c ON c.id = zac.condicio_id
@@ -420,7 +420,7 @@ const createEpigraf = async (req, res) => {
       let id;
       if (condicio.IS_ZONA == 1) {
         const nextCodiResultZona = await connection.execute(
-          `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ecpu_zona_activitat_condicio_TEST`,
+          `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ecpu_zona_activitat_condicio`,
           {},
           { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -428,7 +428,7 @@ const createEpigraf = async (req, res) => {
         id = nextCodiResultZona.rows[0].NEXT_CODI;
 
         await connection.execute(
-          `INSERT INTO ecpu_zona_activitat_condicio_TEST (
+          `INSERT INTO ecpu_zona_activitat_condicio (
               ID, ZONA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR) 
               VALUES (:id, :zona_id, :idEpigraf, :id_condicio, :valor
             )`,
@@ -443,7 +443,7 @@ const createEpigraf = async (req, res) => {
 
       } else {
         const nextCodiResultArea = await connection.execute(
-          `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ecpu_area_activitat_condicio_TEST`,
+          `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ecpu_area_activitat_condicio`,
           {},
           { outFormat: oracledb.OUT_FORMAT_OBJECT }
         );
@@ -451,7 +451,7 @@ const createEpigraf = async (req, res) => {
         id = nextCodiResultArea.rows[0].NEXT_CODI;
 
         await connection.execute(
-          `INSERT INTO ecpu_area_activitat_condicio_TEST 
+          `INSERT INTO ecpu_area_activitat_condicio 
            (ID, AREA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR) 
            VALUES (:id, :area_id, :idEpigraf, :id_condicio, :valor)`,
           {
@@ -492,12 +492,14 @@ const createEpigraf = async (req, res) => {
     }
 
     dades.CONDICIONS.forEach(condicio => {
-      if (condicio.CONDICIO_ID = null) {
+      if (condicio.CONDICIO_ID == null) {
         faltenDades = true;
         camp = "Condicio" + condicio.CODI;
         return { faltenDades, camp };
       }
     });
+
+    return { faltenDades, camp };
   }
 };
 
@@ -507,10 +509,10 @@ const updateCondicio = async (req, res) => {
     const { condicio } = req.body;
 
     connection = await db();
-
+    
     if (condicio.IS_ZONA) {
-      const result = await connection.execute(
-        `UPDATE ecpu_zona_activitat_condicio_test SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
+            const result = await connection.execute(
+        `UPDATE ecpu_zona_activitat_condicio SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
         {
           condicio_id: condicio.CONDICIO_ID,
           valor: condicio.VALOR,
@@ -526,7 +528,7 @@ const updateCondicio = async (req, res) => {
       res.status(200).send('Condició actualitzada correctament.');
     } else {
       const result = await connection.execute(
-        `UPDATE ecpu_area_activitat_condicio_test SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
+        `UPDATE ecpu_area_activitat_condicio SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
         {
           condicio_id: condicio.CONDICIO_ID,
           valor: condicio.VALOR,

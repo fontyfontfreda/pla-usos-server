@@ -20,9 +20,9 @@ const getAllActivitats = async (req, res) => {
         g.descripcio AS "descripcio_grup", 
         s.descripcio AS "descripcio_subgrup", 
         a.descripcio AS "descripcio_activitat" 
-       FROM ecpu_descripcio_activitat_test a 
-       RIGHT JOIN ecpu_subgrup_activitat_test s ON a.id_subgrup_activitat = s.id
-       RIGHT JOIN ecpu_grup_activitat_test g ON s.codi_grup_activitat = g.codi`,
+       FROM ecpu_descripcio_activitat a 
+       RIGHT JOIN ecpu_subgrup_activitat s ON a.id_subgrup_activitat = s.id
+       RIGHT JOIN ecpu_grup_activitat g ON s.codi_grup_activitat = g.codi`,
       [],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -156,12 +156,12 @@ const getActivitats = async (req, res) => {
                   sa.descripcio AS "descripcio_subgrup", da.id AS "codi_descripcio_activitat", 
                   da.descripcio AS "descripcio_descripcio_activitat", c.id AS "id_condicio", 
                   zac.valor AS "valor_condicio", c.descripcio AS "condicio"
-           FROM ecpu_zona_activitat_condicio_test zac 
+           FROM ecpu_zona_activitat_condicio zac 
            JOIN ecpu_condicio c ON zac.condicio_id = c.id 
            JOIN ecpu_epigraf e ON e.id = zac.epigraf_id
-           JOIN ecpu_descripcio_activitat_test da ON da.id_epigraf = e.id
-           JOIN ecpu_subgrup_activitat_test sa ON da.id_subgrup_activitat = sa.id 
-           JOIN ecpu_grup_activitat_test ga ON sa.codi_grup_activitat = ga.codi 
+           JOIN ecpu_descripcio_activitat da ON da.id_epigraf = e.id
+           JOIN ecpu_subgrup_activitat sa ON da.id_subgrup_activitat = sa.id 
+           JOIN ecpu_grup_activitat ga ON sa.codi_grup_activitat = ga.codi 
            WHERE zona_id = :zona_id
            AND e.mostrar = 1
            AND da.mostrar = 1`,
@@ -177,12 +177,12 @@ const getActivitats = async (req, res) => {
                   sa.descripcio AS "descripcio_subgrup", da.id AS "codi_descripcio_activitat", 
                   da.descripcio AS "descripcio_descripcio_activitat", c.id AS "id_condicio", 
                   aac.valor AS "valor_condicio", c.descripcio AS "condicio" 
-           FROM ecpu_area_activitat_condicio_test aac 
+           FROM ecpu_area_activitat_condicio aac 
            JOIN ecpu_condicio c ON aac.condicio_id = c.id 
            JOIN ecpu_epigraf e ON e.id = aac.epigraf_id
-           JOIN ecpu_descripcio_activitat_test da ON da.id_epigraf = e.id
-           JOIN ecpu_subgrup_activitat_test sa ON da.id_subgrup_activitat = sa.id 
-           JOIN ecpu_grup_activitat_test ga ON sa.codi_grup_activitat = ga.codi 
+           JOIN ecpu_descripcio_activitat da ON da.id_epigraf = e.id
+           JOIN ecpu_subgrup_activitat sa ON da.id_subgrup_activitat = sa.id 
+           JOIN ecpu_grup_activitat ga ON sa.codi_grup_activitat = ga.codi 
            WHERE aac.area_id = :area_id
            AND e.mostrar = 1
            AND da.mostrar = 1`,
@@ -226,7 +226,7 @@ const consultaActivitat = async (req, res) => {
         `BEGIN ECPU_INSERIR_CONSULTA_I_VISTA_BUFFER(
           :DNI_interessat, :nom_interessat, :actuacio_interessat, :DOMCOD,
           :grup_id, :grup_descripcio, :subgrup_id, :subgrup_descripcio,
-          : , :condicio_id, :valor_condicio,
+          :activitat_id , :condicio_id, :valor_condicio,
           :is_altres, :descripcio_altres, :is_valid,
           :coord_x, :coord_y, :insertedId
         ); END;`,
@@ -626,9 +626,9 @@ const getActivitat = async (req, res) => {
             da.mostrar AS "mostrar",
             e.id AS "id_epigraf",
             e.descripcio AS "descripcio_epigraf"
-        FROM ecpu_descripcio_activitat_test da
-        JOIN ecpu_subgrup_activitat_test sa ON sa.id = da.id_subgrup_activitat
-        JOIN ecpu_grup_activitat_test ga ON ga.codi = sa.codi_grup_activitat
+        FROM ecpu_descripcio_activitat da
+        JOIN ecpu_subgrup_activitat sa ON sa.id = da.id_subgrup_activitat
+        JOIN ecpu_grup_activitat ga ON ga.codi = sa.codi_grup_activitat
         JOIN ecpu_epigraf e ON e.id = da.id_epigraf
         WHERE da.descripcio = :activitat AND sa.descripcio = :subgrup AND ga.descripcio = :grup`,
         {
@@ -675,8 +675,8 @@ const getSubgrup = async (req, res) => {
             ga.descripcio AS "descripcio_grup",
             sa.id AS "id_subgrup",
             sa.descripcio AS "descripcio_subgrup"
-        FROM ecpu_subgrup_activitat_test sa 
-        JOIN ecpu_grup_activitat_test ga ON ga.codi = sa.codi_grup_activitat
+        FROM ecpu_subgrup_activitat sa 
+        JOIN ecpu_grup_activitat ga ON ga.codi = sa.codi_grup_activitat
         WHERE sa.descripcio = :subgrup AND ga.descripcio = :grup`,
         {
           subgrup: subgrup,
@@ -715,7 +715,7 @@ const getGrup = async (req, res) => {
         `SELECT
             ga.codi AS "codi_grup",
             ga.descripcio AS "descripcio_grup"
-        FROM ecpu_grup_activitat_test ga
+        FROM ecpu_grup_activitat ga
         WHERE ga.descripcio = :grup`,
         {
           grup: grup
@@ -811,7 +811,7 @@ const updateActivitat = async (req, res) => {
     switch (activitat.editing) {
       case 1:
         const result1 = await connection.execute(
-          `UPDATE ecpu_grup_activitat_test SET DESCRIPCIO = :descripcio WHERE CODI = :codi`,
+          `UPDATE ecpu_grup_activitat SET DESCRIPCIO = :descripcio WHERE CODI = :codi`,
           {
             descripcio: activitat.descripcio_grup,
             codi: activitat.codi_grup
@@ -826,7 +826,7 @@ const updateActivitat = async (req, res) => {
         break;
       case 2:
         const result2 = await connection.execute(
-          `UPDATE ecpu_subgrup_activitat_test SET DESCRIPCIO = :descripcio WHERE ID = :id`,
+          `UPDATE ecpu_subgrup_activitat SET DESCRIPCIO = :descripcio WHERE ID = :id`,
           {
             descripcio: activitat.descripcio_subgrup,
             id: activitat.id_subgrup
@@ -840,7 +840,7 @@ const updateActivitat = async (req, res) => {
         break;
       case 3:
         const result3 = await connection.execute(
-          `UPDATE ecpu_descripcio_activitat_test SET DESCRIPCIO = :descripcio, MOSTRAR = :mostar, id_epigraf = :epigraf_id WHERE ID = :id`,
+          `UPDATE ecpu_descripcio_activitat SET DESCRIPCIO = :descripcio, MOSTRAR = :mostar, id_epigraf = :epigraf_id WHERE ID = :id`,
           {
             descripcio: activitat.descripcio_activitat,
             mostar: activitat.mostrar ? 1 : 0,
@@ -875,7 +875,7 @@ const createGrup = async (req, res) => {
     connection = await db();
 
     const nextCodiResult = await connection.execute(
-      `SELECT NVL(MAX(CODI), 0) + 1 AS NEXT_CODI FROM ECPU_GRUP_ACTIVITAT_TEST`,
+      `SELECT NVL(MAX(CODI), 0) + 1 AS NEXT_CODI FROM ECPU_GRUP_ACTIVITAT`,
       {},
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -883,7 +883,7 @@ const createGrup = async (req, res) => {
     let codiGrup = nextCodiResult.rows[0].NEXT_CODI;
 
     const result1 = await connection.execute(
-      `INSERT INTO ecpu_grup_activitat_test (codi, descripcio) VALUES (:codi, :descripcio)`,
+      `INSERT INTO ecpu_grup_activitat (codi, descripcio) VALUES (:codi, :descripcio)`,
       {
         codi: codiGrup,
         descripcio: grup.descripcio_grup,
@@ -920,7 +920,7 @@ const createSubgrup = async (req, res) => {
     connection = await db();
 
     const nextCodiResult = await connection.execute(
-      `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ECPU_SUBGRUP_ACTIVITAT_TEST`,
+      `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ECPU_SUBGRUP_ACTIVITAT`,
       {},
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -928,13 +928,13 @@ const createSubgrup = async (req, res) => {
     let codiSubrup = nextCodiResult.rows[0].NEXT_CODI;
 
     const codiGrup = await connection.execute(
-      `SELECT CODI FROM ECPU_GRUP_ACTIVITAT_TEST WHERE DESCRIPCIO = :descripcio`,
+      `SELECT CODI FROM ECPU_GRUP_ACTIVITAT WHERE DESCRIPCIO = :descripcio`,
       { descripcio: grup },
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );    
 
     const result1 = await connection.execute(
-      `INSERT INTO ecpu_subgrup_activitat_test (id, descripcio, CODI, CODI_GRUP_ACTIVITAT) VALUES (:id, :descripcio, 1, :codi_grup)`,
+      `INSERT INTO ecpu_subgrup_activitat (id, descripcio, CODI, CODI_GRUP_ACTIVITAT) VALUES (:id, :descripcio, 1, :codi_grup)`,
       {
         id: codiSubrup,
         descripcio: subgrup.descripcio_subgrup,
@@ -980,7 +980,7 @@ const createActivitat = async (req, res) => {
     connection = await db();
 
     const nextCodiResult = await connection.execute(
-      `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ECPU_DESCRIPCIO_ACTIVITAT_TEST`,
+      `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ECPU_DESCRIPCIO_ACTIVITAT`,
       {},
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -988,13 +988,13 @@ const createActivitat = async (req, res) => {
     let codiActivitat = nextCodiResult.rows[0].NEXT_CODI;
 
     const codiSubgrup = await connection.execute(
-      `SELECT ID FROM ECPU_SUBGRUP_ACTIVITAT_TEST WHERE DESCRIPCIO = :descripcio`,
+      `SELECT ID FROM ECPU_SUBGRUP_ACTIVITAT WHERE DESCRIPCIO = :descripcio`,
       { descripcio: activitat.subgrup },
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );    
 
     const result1 = await connection.execute(
-      `INSERT INTO ecpu_descripcio_activitat_test (ID, ID_SUBGRUP_ACTIVITAT, ID_EPIGRAF, CODI, DESCRIPCIO, MOSTRAR) VALUES (:id, :id_subgrup, :id_epigraf, 1, :descripcio, :mostrar)`,
+      `INSERT INTO ecpu_descripcio_activitat (ID, ID_SUBGRUP_ACTIVITAT, ID_EPIGRAF, CODI, DESCRIPCIO, MOSTRAR) VALUES (:id, :id_subgrup, :id_epigraf, 1, :descripcio, :mostrar)`,
       {
         id: codiActivitat,
         id_subgrup: codiSubgrup.rows[0].ID,
