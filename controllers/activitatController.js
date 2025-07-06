@@ -20,9 +20,9 @@ const getAllActivitats = async (req, res) => {
         g.descripcio AS "descripcio_grup", 
         s.descripcio AS "descripcio_subgrup", 
         a.descripcio AS "descripcio_activitat" 
-       FROM ecpu_descripcio_activitat a 
-       JOIN ecpu_subgrup_activitat s ON a.id_subgrup_activitat = s.id
-       JOIN ecpu_grup_activitat g ON s.codi_grup_activitat = g.codi`,
+       FROM ecpu_descripcio_activitat_test a 
+       RIGHT JOIN ecpu_subgrup_activitat_test s ON a.id_subgrup_activitat = s.id
+       RIGHT JOIN ecpu_grup_activitat_test g ON s.codi_grup_activitat = g.codi`,
       [],
       { outFormat: oracledb.OUT_FORMAT_OBJECT }
     );
@@ -36,19 +36,29 @@ const getAllActivitats = async (req, res) => {
     activitats.rows.forEach(row => {
       const { descripcio_grup, descripcio_subgrup, descripcio_activitat } = row;
 
-      // Si no existeix el grup, el creem
+      // Si no hi ha grup, descartem
+      if (!descripcio_grup || descripcio_grup === 'null') {
+        return;
+      }
+
+      // Assegurem que el grup existeix
       if (!resultat[descripcio_grup]) {
         resultat[descripcio_grup] = {};
       }
 
-      // Si no existeix el subgrup dins el grup, el creem
-      if (!resultat[descripcio_grup][descripcio_subgrup]) {
-        resultat[descripcio_grup][descripcio_subgrup] = [];
-      }
+      // Si hi ha subgrup, l’afegim (amb o sense activitat)
+      if (descripcio_subgrup && descripcio_subgrup !== 'null') {
+        if (!resultat[descripcio_grup][descripcio_subgrup]) {
+          resultat[descripcio_grup][descripcio_subgrup] = [];
+        }
 
-      // Afegim l'activitat dins el subgrup
-      resultat[descripcio_grup][descripcio_subgrup].push(descripcio_activitat);
+        // Si també hi ha activitat, l’afegim a la llista
+        if (descripcio_activitat && descripcio_activitat !== 'null') {
+          resultat[descripcio_grup][descripcio_subgrup].push(descripcio_activitat);
+        }
+      }
     });
+
 
     res.status(200).json(resultat);
   } catch (error) {
@@ -102,7 +112,7 @@ const pdfConsulta = async (req, res) => {
     if (isOlot)
       await inserirVista(connection, fila.COORD_X, fila.COORD_Y, consultaId);
 
-    const  buffer  = await generarPDF(isConsultaValida(activitat, connection, adreca), activitat, adreca);
+    const buffer = await generarPDF(isConsultaValida(activitat, connection, adreca), activitat, adreca);
 
     // ✅ Enviar directament el PDF com a resposta binària
     res.set({
@@ -210,7 +220,7 @@ const consultaActivitat = async (req, res) => {
       // Enviar correu a consorci
     } else {
 
-      let is_apte = await isConsultaValida(activitat, connection, adreca);      
+      let is_apte = await isConsultaValida(activitat, connection, adreca);
 
       const result = await connection.execute(
         `BEGIN ECPU_INSERIR_CONSULTA_I_VISTA_BUFFER(
@@ -244,7 +254,7 @@ const consultaActivitat = async (req, res) => {
 
       if (isOlot)
         await inserirVista(connection, adreca.coord_x, adreca.coord_y, result.outBinds.insertedId);
-      
+
 
       if (result.rowsAffected === 0) {
         return res.status(404).send('No s\'ha pogut crear la consulta');
@@ -442,97 +452,97 @@ function generarPDF(is_apte, activitat, adreca) {
           });
 
         doc.moveDown();
-      }else {
-      // Informació
-      doc.font('Helvetica-Bold')
-        .fontSize(12)
-        .text(titolInformacioPDF(is_apte, activitat.id_condicio), { align: 'center' });
-
-      let motiu;
-      if (is_apte) {
-        motiu = '';
       } else {
+        // Informació
+        doc.font('Helvetica-Bold')
+          .fontSize(12)
+          .text(titolInformacioPDF(is_apte, activitat.id_condicio), { align: 'center' });
+
+        let motiu;
+        if (is_apte) {
+          motiu = '';
+        } else {
+          doc.text('\n', { align: 'left' });
+
+          switch (activitat.id_condicio) {
+            case 4:
+              motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 50 metres.';
+              break;
+            case 5:
+              motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 100 metres.';
+              break;
+            case 6:
+              motiu = 'Motiu: Ja hi ha ' + activitat.valor_condicio + ' activitats del mateix grup en un radi de 50 metres.';
+              break;
+            case 7:
+              motiu = 'Motiu: El carrer fa menys de ' + activitat.valor_condicio + ' metres.';
+              break;
+            case 9:
+              motiu = 'Motiu: El local no es troba en un 1r pis.';
+              break;
+            default:
+              motiu = '';
+              break;
+          }
+        }
+        doc.font('Helvetica')
+          .fontSize(10)
+          .text(motiu, { align: 'left' });
+
+        doc.font('Helvetica')
+          .fontSize(10)
+          .text('\n', { align: 'left' });
+
+
+        // Paràgraf 1
+        if (activitat.id_condicio != 1 && activitat.id_condicio != 2 && activitat.id_condicio != 3 && is_apte) {
+          doc.font('Helvetica')
+            .fontSize(10)
+            .fillColor('red')
+            .text('ALERTA: ', { continued: true })  // continua a la mateixa línia
+
+          doc.fillColor('black')
+            .text('aquesta activitat està admesa amb condicions i, per tant, hauràs de dirigir-te al Consorci de Medi Ambient i Salut Pública (SIGMA) per tal que et verifiquin que l’activitat és apte en aquest establiment.', {
+              align: 'left'
+            });
+
+          doc.moveDown();
+        }
+
+        // Paràgraf 2
+        if (!(activitat.id_condicio == 1 || activitat.id_condicio == 2 || activitat.id_condicio == 3) && is_apte) {
+          doc.text('Si vols crear una reserva d’aquest local amb la teva activitat, has d’enviar un correu a SIGMA a la següent adreça aculebras@consorcisigma.org adjuntant el teu informe final generat pel visor del Pla d’Usos i demanant la teva reserva, la qual tindrà una durada de 15 dies.', { align: 'left' });
+
+          doc.font('Helvetica-Bold')
+            .fontSize(10)
+            .fillColor('black')
+            .text('IMPORTANT: ', { continued: true })  // continua a la mateixa línia
+
+          doc.font('Helvetica')
+            .fillColor('black')
+            .text('si durant aquest període de 15 dies SIGMA no rep la teva tramitació de documentació per gestionar la llicència d’activitat, la teva reserva s’anul·larà.', {
+              align: 'left'
+            });
+        }
+
         doc.text('\n', { align: 'left' });
 
-        switch (activitat.id_condicio) {
-          case 4:
-            motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 50 metres.';
-            break;
-          case 5:
-            motiu = 'Motiu: Ja hi ha una activitat del mateix grup en un radi de 100 metres.';
-            break;
-          case 6:
-            motiu = 'Motiu: Ja hi ha ' + activitat.valor_condicio + ' activitats del mateix grup en un radi de 50 metres.';
-            break;
-          case 7:
-            motiu = 'Motiu: El carrer fa menys de ' + activitat.valor_condicio + ' metres.';
-            break;
-          case 9:
-            motiu = 'Motiu: El local no es troba en un 1r pis.';
-            break;
-          default:
-            motiu = '';
-            break;
+        // Paràgraf 3
+        if (activitat.id_condicio != 1 && is_apte) {
+          if (activitat.id_condicio == 2 || activitat.id_condicio == 3)
+            doc.text('Aquest document s’ha d’entregar al SIGMA (Consorci de Medi Ambient i Salut Pública) i té una vigència d’un mes.', { align: 'left' });
+          else
+            doc.fontSize(8).text('Aquest document té una vigència d’un mes.', { align: 'left' });
+          doc.moveDown();
         }
-      }
-      doc.font('Helvetica')
-        .fontSize(10)
-        .text(motiu, { align: 'left' });
 
-      doc.font('Helvetica')
-        .fontSize(10)
-        .text('\n', { align: 'left' });
+        // Paràgraf 4
+        doc.fontSize(8).text('Document sense valor normatiu, vàlid només a efectes informatius.', { align: 'left' });
 
+        doc.text('\n', { align: 'left' });
 
-      // Paràgraf 1
-      if (activitat.id_condicio != 1 && activitat.id_condicio != 2 && activitat.id_condicio != 3 && is_apte) {
-        doc.font('Helvetica')
-          .fontSize(10)
-          .fillColor('red')
-          .text('ALERTA: ', { continued: true })  // continua a la mateixa línia
-
-        doc.fillColor('black')
-          .text('aquesta activitat està admesa amb condicions i, per tant, hauràs de dirigir-te al Consorci de Medi Ambient i Salut Pública (SIGMA) per tal que et verifiquin que l’activitat és apte en aquest establiment.', {
-            align: 'left'
-          });
-
-        doc.moveDown();
-      }
-
-      // Paràgraf 2
-      if (!(activitat.id_condicio == 1 || activitat.id_condicio == 2 || activitat.id_condicio == 3) && is_apte) {
-        doc.text('Si vols crear una reserva d’aquest local amb la teva activitat, has d’enviar un correu a SIGMA a la següent adreça aculebras@consorcisigma.org adjuntant el teu informe final generat pel visor del Pla d’Usos i demanant la teva reserva, la qual tindrà una durada de 15 dies.', { align: 'left' });
-
-        doc.font('Helvetica-Bold')
-          .fontSize(10)
-          .fillColor('black')
-          .text('IMPORTANT: ', { continued: true })  // continua a la mateixa línia
-
-        doc.font('Helvetica')
-          .fillColor('black')
-          .text('si durant aquest període de 15 dies SIGMA no rep la teva tramitació de documentació per gestionar la llicència d’activitat, la teva reserva s’anul·larà.', {
-            align: 'left'
-          });
-      }
-
-      doc.text('\n', { align: 'left' });
-
-      // Paràgraf 3
-      if (activitat.id_condicio != 1 && is_apte) {
-        if (activitat.id_condicio == 2 || activitat.id_condicio == 3)
-          doc.text('Aquest document s’ha d’entregar al SIGMA (Consorci de Medi Ambient i Salut Pública) i té una vigència d’un mes.', { align: 'left' });
-        else
-          doc.fontSize(8).text('Aquest document té una vigència d’un mes.', { align: 'left' });
-        doc.moveDown();
-      }
-
-      // Paràgraf 4
-      doc.fontSize(8).text('Document sense valor normatiu, vàlid només a efectes informatius.', { align: 'left' });
-
-      doc.text('\n', { align: 'left' });
-
-      // Paràgraf 5
-      doc.fontSize(8).text('Aquest informe no indica si en aquest local ja hi ha una activitat existent i tampoc es contemplen variacions de domicilis.', { align: 'left' });
+        // Paràgraf 5
+        doc.fontSize(8).text('Aquest informe no indica si en aquest local ja hi ha una activitat existent i tampoc es contemplen variacions de domicilis.', { align: 'left' });
       }
       doc.end();
 
@@ -592,57 +602,50 @@ const getActivitat = async (req, res) => {
   try {
     connection = await db();
     const activitat = req.params.activitat;
+    const subgrup = req.params.subgrup;
+    const grup = req.params.grup;
 
     if (!activitat) {
       console.error('❌ Falta el paràmetre activitat:', error);
       res.status(400).send('❌ Falta el paràmetre activitat');
+    } else if (!subgrup) {
+      console.error('❌ Falta el paràmetre subgrup:', error);
+      res.status(400).send('❌ Falta el paràmetre subgrup');
+    } else if (!grup) {
+      console.error('❌ Falta el paràmetre grup:', error);
+      res.status(400).send('❌ Falta el paràmetre grup');
     } else {
       const result = await connection.execute(
         `SELECT
-              aac.id,
-              0 AS is_zona,
-              z.codi || '.' || at.codi AS codi, 
-              aac.condicio_id,
-              c.descripcio AS condicio, 
-              aac.valor,
-              da.descripcio
-          FROM ecpu_area_activitat_condicio aac
-          JOIN ecpu_descripcio_activitat da ON da.id = aac.descripcio_activitat_id
-          JOIN ecpu_area_tractament at ON at.id = aac.area_id
-          JOIN ecpu_zona z ON at.id_zona = z.id
-          JOIN ecpu_condicio c ON c.id = aac.condicio_id
-          WHERE da.descripcio = :activitat
-          UNION
-          SELECT
-              zac.id,
-              1 AS is_zona,
-              TO_CHAR(z.codi) AS codi,
-              zac.condicio_id,
-              c.descripcio AS condicio, 
-              zac.valor,
-              da.descripcio
-          FROM ecpu_zona_activitat_condicio zac
-          JOIN ecpu_descripcio_activitat da ON da.id = zac.descripcio_activitat_id
-          JOIN ecpu_zona z ON zac.zona_id = z.id
-          JOIN ecpu_condicio c ON c.id = zac.condicio_id
-          WHERE da.descripcio = :activitat
-          ORDER BY codi`,
+            ga.codi AS "codi_grup",
+            ga.descripcio AS "descripcio_grup",
+            sa.id AS "id_subgrup",
+            sa.descripcio AS "descripcio_subgrup",
+            da.id AS "id_activitat",
+            da.descripcio AS "descripcio_activitat",
+            da.mostrar AS "mostrar",
+            e.id AS "id_epigraf",
+            e.descripcio AS "descripcio_epigraf"
+        FROM ecpu_descripcio_activitat_test da
+        JOIN ecpu_subgrup_activitat_test sa ON sa.id = da.id_subgrup_activitat
+        JOIN ecpu_grup_activitat_test ga ON ga.codi = sa.codi_grup_activitat
+        JOIN ecpu_epigraf e ON e.id = da.id_epigraf
+        WHERE da.descripcio = :activitat AND sa.descripcio = :subgrup AND ga.descripcio = :grup`,
         {
-          activitat: activitat
+          activitat: activitat,
+          subgrup: subgrup,
+          grup: grup
         },
         { outFormat: oracledb.OUT_FORMAT_OBJECT }
       );
 
-      // Convertim els LOBs a string
-      const rows = await Promise.all(result.rows.map(async row => {
-        return row;
-      }));
+      const activitatData = result.rows[0];
 
-      if (rows.length === 0) {
-        return res.status(404).send('No s\'ha trobat cap consulta');
+      if (!activitatData) {
+        return res.status(404).send("No s'ha trobat l'activitat");
       }
 
-      res.status(200).json(rows);
+      res.status(200).json(activitatData);
     }
   } catch (error) {
     console.error('❌ Error obtenint les dades:', error);
@@ -652,49 +655,85 @@ const getActivitat = async (req, res) => {
   }
 };
 
-const updateCondicio = async (req, res) => {
+const getSubgrup = async (req, res) => {
   let connection;
   try {
-    const { condicio } = req.body;
-
     connection = await db();
+    const subgrup = req.params.subgrup;
+    const grup = req.params.grup;
 
-    if (condicio.IS_ZONA) {
-      const result = await connection.execute(
-        `UPDATE ecpu_zona_activitat_condicio SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
-        {
-          condicio_id: condicio.CONDICIO_ID,
-          valor: condicio.VALOR,
-          id: condicio.ID
-        },
-        { autoCommit: true }
-      );
-
-      if (result.rowsAffected === 0) {
-        return res.status(404).send('Condició no trobada.');
-      }
-
-      res.status(200).send('Condició actualitzada correctament.');
+    if (!subgrup) {
+      console.error('❌ Falta el paràmetre subgrup:', error);
+      res.status(400).send('❌ Falta el paràmetre subgrup');
+    } else if (!grup) {
+      console.error('❌ Falta el paràmetre grup:', error);
+      res.status(400).send('❌ Falta el paràmetre grup');
     } else {
       const result = await connection.execute(
-        `UPDATE ecpu_area_activitat_condicio SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
+        `SELECT
+            ga.codi AS "codi_grup",
+            ga.descripcio AS "descripcio_grup",
+            sa.id AS "id_subgrup",
+            sa.descripcio AS "descripcio_subgrup"
+        FROM ecpu_subgrup_activitat_test sa 
+        JOIN ecpu_grup_activitat_test ga ON ga.codi = sa.codi_grup_activitat
+        WHERE sa.descripcio = :subgrup AND ga.descripcio = :grup`,
         {
-          condicio_id: condicio.CONDICIO_ID,
-          valor: condicio.VALOR,
-          id: condicio.ID
+          subgrup: subgrup,
+          grup: grup
         },
-        { autoCommit: true }
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
       );
 
-      if (result.rowsAffected === 0) {
-        return res.status(404).send('Condició no trobada.');
+      const activitatData = result.rows[0];
+
+      if (!activitatData) {
+        return res.status(404).send("No s'ha trobat el subgrup");
       }
 
-      res.status(200).send('Condició actualitzada correctament.');
+      res.status(200).json(activitatData);
     }
   } catch (error) {
-    console.error('❌ Error actualitzant la condició:', error);
-    res.status(500).send('Error actualitzant la condició.');
+    console.error('❌ Error obtenint les dades:', error);
+    res.status(500).send('Error obtenint les dades');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+const getGrup = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+    const grup = req.params.grup;
+
+    if (!grup) {
+      console.error('❌ Falta el paràmetre grup:', error);
+      res.status(400).send('❌ Falta el paràmetre grup');
+    } else {
+      const result = await connection.execute(
+        `SELECT
+            ga.codi AS "codi_grup",
+            ga.descripcio AS "descripcio_grup"
+        FROM ecpu_grup_activitat_test ga
+        WHERE ga.descripcio = :grup`,
+        {
+          grup: grup
+        },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      );
+
+      const activitatData = result.rows[0];
+
+      if (!activitatData) {
+        return res.status(404).send("No s'ha trobat el grup");
+      }
+
+      res.status(200).json(activitatData);
+    }
+  } catch (error) {
+    console.error('❌ Error obtenint les dades:', error);
+    res.status(500).send('Error obtenint les dades');
   } finally {
     if (connection) await connection.close();
   }
@@ -762,78 +801,218 @@ const getArees = async (req, res) => {
   }
 };
 
-const addActivitat = async (req, res) => {
+const updateActivitat = async (req, res) => {
   let connection;
   try {
+    const { activitat } = req.body;
+
     connection = await db();
 
-    const { dades } = req.body;
-    const condicions = dades.CONDICIONS;
-
-    const result = await connection.execute(
-      `BEGIN 
-         ecpu_crear_activitat(
-           :p_grup,
-           :p_codi_grup,
-           :p_subgrup,
-           :p_codi_subgrup,
-           :p_activitat,
-           :p_codi_activitat,
-           :p_id_activitat
-         ); 
-       END;`,
-      {
-        p_grup: dades.GRUP,
-        p_codi_grup: dades.CODI_GRUP,
-        p_subgrup: dades.SUBGRUP,
-        p_codi_subgrup: dades.CODI_SUBGRUP,
-        p_activitat: dades.DESCRIPCIO,
-        p_codi_activitat: dades.CODI_ACTIVITAT,
-        p_id_activitat: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
-      }
-    );
-
-    const idActivitat = result.outBinds.p_id_activitat;
-
-    for (const condicio of condicions) {
-      if (condicio.IS_ZONA == 1) {
-        await connection.execute(
-          `INSERT INTO ecpu_zona_activitat_condicio (
-              ID, ZONA_ID, DESCRIPCIO_ACTIVITAT_ID, CONDICIO_ID, VALOR
-            ) VALUES (
-              seq_ecpu_zona_activitat_condicio.NEXTVAL, :zona_id, :idActivitat, :id_condicio, :valor
-            )`,
+    switch (activitat.editing) {
+      case 1:
+        const result1 = await connection.execute(
+          `UPDATE ecpu_grup_activitat_test SET DESCRIPCIO = :descripcio WHERE CODI = :codi`,
           {
-            zona_id: condicio.ID_ZONA,
-            idActivitat,
-            id_condicio: condicio.CONDICIO_ID,
-            valor: condicio.VALOR
+            descripcio: activitat.descripcio_grup,
+            codi: activitat.codi_grup
           },
           { autoCommit: true }
         );
 
-      } else {
-        await connection.execute(
-          `INSERT INTO ecpu_area_activitat_condicio 
-           (ID, AREA_ID, DESCRIPCIO_ACTIVITAT_ID, CONDICIO_ID, VALOR) 
-           VALUES (seq_ecpu_area_activitat_condicio.NEXTVAL, :zona_id, :idActivitat, :id_condicio, :valor)`,
+        if (result1.rowsAffected === 0) {
+          return res.status(404).send('Grup no trobat.');
+        }
+
+        break;
+      case 2:
+        const result2 = await connection.execute(
+          `UPDATE ecpu_subgrup_activitat_test SET DESCRIPCIO = :descripcio WHERE ID = :id`,
           {
-            zona_id: condicio.ID_ZONA,
-            idActivitat: idActivitat,
-            id_condicio: +condicio.CONDICIO_ID,
-            valor: condicio.VALOR == null ? condicio.VALOR : +condicio.VALOR
-          }
+            descripcio: activitat.descripcio_subgrup,
+            id: activitat.id_subgrup
+          },
+          { autoCommit: true }
         );
-      }
+
+        if (result2.rowsAffected === 0) {
+          return res.status(404).send('Subgrup no trobat.');
+        }
+        break;
+      case 3:
+        const result3 = await connection.execute(
+          `UPDATE ecpu_descripcio_activitat_test SET DESCRIPCIO = :descripcio, MOSTRAR = :mostar, id_epigraf = :epigraf_id WHERE ID = :id`,
+          {
+            descripcio: activitat.descripcio_activitat,
+            mostar: activitat.mostrar ? 1 : 0,
+            id: activitat.id_activitat,
+            epigraf_id: activitat.id_epigraf
+          },
+          { autoCommit: true }
+        );
+
+        if (result3.rowsAffected === 0) {
+          return res.status(404).send('Activitat no trobada.');
+        }
+        break;
+      default:
+        break;
     }
 
-    await connection.commit(); // Fa el commit només un cop al final
-
-    res.status(200).send('Epígraf creat correctament.');
-
+    res.status(200).send('Epígraf actualitzat correctament.');
   } catch (error) {
-    console.error('❌ Error actualitzant la condició:', error);
-    res.status(500).send('Error actualitzant la condició.');
+    console.error('❌ Error actualitzant l\'epígraf:', error);
+    res.status(500).send('Error actualitzant l\'epígraf.');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+const createGrup = async (req, res) => {
+  let connection;
+  try {
+    const { grup } = req.body;
+
+    connection = await db();
+
+    const nextCodiResult = await connection.execute(
+      `SELECT NVL(MAX(CODI), 0) + 1 AS NEXT_CODI FROM ECPU_GRUP_ACTIVITAT_TEST`,
+      {},
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    let codiGrup = nextCodiResult.rows[0].NEXT_CODI;
+
+    const result1 = await connection.execute(
+      `INSERT INTO ecpu_grup_activitat_test (codi, descripcio) VALUES (:codi, :descripcio)`,
+      {
+        codi: codiGrup,
+        descripcio: grup.descripcio_grup,
+      },
+      { autoCommit: true }
+    );
+
+    if (result1.rowsAffected === 0) {
+      return res.status(404).send('Grup no creat.');
+    }
+
+    res.status(200).send('Grup creat correctament.');
+  } catch (error) {
+    console.error('❌ Error creant el grup:', error);
+    res.status(500).send('Error creant el grup.');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+const createSubgrup = async (req, res) => {
+  let connection;
+  try {
+    const { grup, subgrup } = req.body;
+
+    if (!grup) {
+      return res.status(404).send('Falta el camp grup.');
+    }
+
+    if (!subgrup) {
+      return res.status(404).send('Falta el camp subgrup.');
+    }
+
+    connection = await db();
+
+    const nextCodiResult = await connection.execute(
+      `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ECPU_SUBGRUP_ACTIVITAT_TEST`,
+      {},
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    let codiSubrup = nextCodiResult.rows[0].NEXT_CODI;
+
+    const codiGrup = await connection.execute(
+      `SELECT CODI FROM ECPU_GRUP_ACTIVITAT_TEST WHERE DESCRIPCIO = :descripcio`,
+      { descripcio: grup },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );    
+
+    const result1 = await connection.execute(
+      `INSERT INTO ecpu_subgrup_activitat_test (id, descripcio, CODI, CODI_GRUP_ACTIVITAT) VALUES (:id, :descripcio, 1, :codi_grup)`,
+      {
+        id: codiSubrup,
+        descripcio: subgrup.descripcio_subgrup,
+        codi_grup: codiGrup.rows[0].CODI
+      },
+      { autoCommit: true }
+    );
+
+    if (result1.rowsAffected === 0) {
+      return res.status(404).send('Grup no creat.');
+    }
+
+    res.status(200).send('Grup creat correctament.');
+  } catch (error) {
+    console.error('❌ Error creant el grup:', error);
+    res.status(500).send('Error creant el grup.');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+const createActivitat = async (req, res) => {
+  let connection;
+  try {
+    const { activitat } = req.body;
+
+    if (!activitat.grup) {
+      return res.status(404).send('Falta el camp grup.');
+    }
+
+    if (!activitat.subgrup) {
+      return res.status(404).send('Falta el camp subgrup.');
+    }
+
+    if (!activitat.epigraf) {
+      return res.status(404).send('Falta el camp epigraf.');
+    }
+
+    if (!activitat.activitat.descripcio_activitat) {
+      return res.status(404).send('Falta el camp descripcio.');
+    }
+
+    connection = await db();
+
+    const nextCodiResult = await connection.execute(
+      `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ECPU_DESCRIPCIO_ACTIVITAT_TEST`,
+      {},
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    let codiActivitat = nextCodiResult.rows[0].NEXT_CODI;
+
+    const codiSubgrup = await connection.execute(
+      `SELECT ID FROM ECPU_SUBGRUP_ACTIVITAT_TEST WHERE DESCRIPCIO = :descripcio`,
+      { descripcio: activitat.subgrup },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );    
+
+    const result1 = await connection.execute(
+      `INSERT INTO ecpu_descripcio_activitat_test (ID, ID_SUBGRUP_ACTIVITAT, ID_EPIGRAF, CODI, DESCRIPCIO, MOSTRAR) VALUES (:id, :id_subgrup, :id_epigraf, 1, :descripcio, :mostrar)`,
+      {
+        id: codiActivitat,
+        id_subgrup: codiSubgrup.rows[0].ID,
+        id_epigraf: activitat.epigraf,
+        descripcio: activitat.activitat.descripcio_activitat,
+        mostrar: activitat.activitat.mostrar ? 1 : 0
+      },
+      { autoCommit: true }
+    );
+
+    if (result1.rowsAffected === 0) {
+      return res.status(404).send('Activitat no creada.');
+    }
+
+    res.status(200).send('Activitat creada correctament.');
+  } catch (error) {
+    console.error('❌ Error creant l\'activitat:', error);
+    res.status(500).send('Error creant l\'activitat.');
   } finally {
     if (connection) await connection.close();
   }
@@ -845,8 +1024,12 @@ module.exports = {
   getAllActivitats,
   pdfConsulta,
   getActivitat,
-  updateCondicio,
+  getSubgrup,
+  getGrup,
   getZones,
   getArees,
-  addActivitat
+  updateActivitat,
+  createGrup,
+  createSubgrup,
+  createActivitat
 };

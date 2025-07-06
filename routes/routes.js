@@ -63,11 +63,15 @@ router.get('/consultes/generarPDF/:consultaId', activitatController.pdfConsulta)
 
 //ACTIVITATS
 router.get('/activitats', activitatController.getAllActivitats);
-router.get('/activitats/activitat/:activitat', activitatController.getActivitat);
-router.put('/activitats/condicio', activitatController.updateCondicio);
+router.get('/activitats/activitat/:activitat/:subgrup/:grup', activitatController.getActivitat);
+router.get('/activitats/subgrup/:subgrup/:grup', activitatController.getSubgrup);
+router.get('/activitats/grup/:grup', activitatController.getGrup);
 router.put('/activitats/zones', activitatController.getZones);
 router.put('/activitats/arees', activitatController.getArees);
-router.post('/activitats', activitatController.addActivitat);
+router.put('/activitats/activitat', activitatController.updateActivitat);
+router.post('/activitats/grup', activitatController.createGrup);
+router.post('/activitats/subgrup', activitatController.createSubgrup);
+router.post('/activitats/activitat', activitatController.createActivitat);
 
 // Ruta protegida amb JWT
 router.get('/protected', (req, res) => {
