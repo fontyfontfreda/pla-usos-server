@@ -41,6 +41,10 @@ router.put('/adreces/:domcod', upload.single('imatge'), adrecaController.actuali
 router.post('/upload-epigrafs', upload.single('file'), condicioController.processEpigrafUpload);
 router.post('/upload-condicions', upload.single('file'), condicioController.processCondicionsUpload);
 router.get('/epigrafs', condicioController.getEpigrafs);
+router.post('/epigrafs', condicioController.createEpigraf);
+router.get('/epigrafs/:id', condicioController.getEpigraf);
+router.put('/epigrafs/condicio', condicioController.updateCondicio);
+router.put('/epigrafs/epigraf', condicioController.updateEpigraf);
 
 //ZONES/ÀREES
 router.post('/zones/zona', zonaController.createZona);

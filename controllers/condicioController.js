@@ -146,7 +146,6 @@ const processCondicionsUpload = async (req, res) => {
   }
 };
 
-
 const processEpigrafUpload = async (req, res) => {
   let connection;
   try {
@@ -302,9 +301,290 @@ const getEpigrafs = async (req, res) => {
   }
 };
 
+const getEpigraf = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+
+    const epigraf = req.params.id;
+
+    if (!epigraf) {
+      console.error('❌ Falta el paràmetre id:', error);
+      res.status(400).send('❌ Falta el paràmetre id');
+    } else {
+      const resultEpigraf = await connection.execute(
+        `SELECT *
+            FROM ecpu_epigraf
+            WHERE id = :epigraf`,
+        {
+          epigraf: epigraf
+        },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      );
+
+      const result = await connection.execute(
+        `SELECT
+              aac.id,
+              0 AS is_zona,
+              z.codi || '.' || at.codi AS codi, 
+              aac.condicio_id,
+              c.descripcio AS condicio, 
+              aac.valor
+          FROM ecpu_area_activitat_condicio_test aac
+          JOIN ecpu_epigraf e ON e.id = aac.epigraf_id
+          JOIN ecpu_area_tractament at ON at.id = aac.area_id
+          JOIN ecpu_zona z ON at.id_zona = z.id
+          JOIN ecpu_condicio c ON c.id = aac.condicio_id
+          WHERE e.id = :epigraf
+          UNION
+          SELECT
+              zac.id,
+              1 AS is_zona,
+              TO_CHAR(z.codi) AS codi,
+              zac.condicio_id,
+              c.descripcio AS condicio, 
+              zac.valor
+          FROM ecpu_zona_activitat_condicio_test zac
+          JOIN ecpu_epigraf e ON e.id = zac.epigraf_id
+          JOIN ecpu_zona z ON zac.zona_id = z.id
+          JOIN ecpu_condicio c ON c.id = zac.condicio_id
+          WHERE e.id = :epigraf
+          ORDER BY codi`,
+        {
+          epigraf: epigraf
+        },
+        { outFormat: oracledb.OUT_FORMAT_OBJECT }
+      );
+
+      const epigrafData = resultEpigraf.rows[0];
+
+      if (!epigrafData) {
+        return res.status(404).send("No s'ha trobat l'epígraf");
+      }
+
+      const condicions = result.rows;
+
+      const resposta = {
+        ...epigrafData,
+        condicions
+      };
+
+      res.status(200).json(resposta);
+    }
+  } catch (error) {
+    console.error('❌ Error obtenint les dades:', error);
+    res.status(500).send('Error obtenint les dades');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+const createEpigraf = async (req, res) => {
+  let connection;
+  try {
+    connection = await db();
+
+    const { dades } = req.body;
+    const condicions = dades.CONDICIONS;
+
+    const { faltenDades, camp } = controlParametres(dades);
+
+    if (faltenDades)
+      return res.status(404).send('Hi ha un problema amb el camp ' + camp);
+
+    const epigrafResult = await connection.execute(
+      `SELECT ID FROM ECPU_EPIGRAF 
+         WHERE CODI1 = :c1 AND CODI2 = :c2 AND CODI3 = :c3`,
+      { c1: dades.codi1, c2: dades.codi2, c3: dades.codi3 },
+      { outFormat: oracledb.OUT_FORMAT_OBJECT }
+    );
+
+    const ID_EPIGRAF = epigrafResult.rows[0]?.ID;
+    if (ID_EPIGRAF)
+      return res.status(404).send('Ja hi ha un epígraf amb aquest codi');
+
+    //INSERT DE L'EPÍGRAF
+    const result = await connection.execute(
+      `INSERT INTO ECPU_EPIGRAF (CODI1, CODI2, CODI3, DESCRIPCIO, MOSTRAR) 
+       VALUES (:c1, :c2 , :c3, :descripcio, :mostrar) RETURNING ID INTO :id`,
+      {
+        c1: dades.codi1, c2: dades.codi2, c3: dades.codi3, descripcio: dades.descripcio, mostrar: dades.mostrar ? 1 : 0,
+        id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER }
+      }
+    );
+
+    const EPIGRAF_ID = result.outBinds.id[0];
+
+    //ISNSERT DE LES CONDICIONS
+    for (const condicio of condicions) {
+      let id;
+      if (condicio.IS_ZONA == 1) {
+        const nextCodiResultZona = await connection.execute(
+          `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ecpu_zona_activitat_condicio_TEST`,
+          {},
+          { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+
+        id = nextCodiResultZona.rows[0].NEXT_CODI;
+
+        await connection.execute(
+          `INSERT INTO ecpu_zona_activitat_condicio_TEST (
+              ID, ZONA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR) 
+              VALUES (:id, :zona_id, :idEpigraf, :id_condicio, :valor
+            )`,
+          {
+            id: id,
+            zona_id: condicio.ID_ZONA,
+            idEpigraf: EPIGRAF_ID,
+            id_condicio: condicio.CONDICIO_ID,
+            valor: condicio.VALOR == null ? condicio.VALOR : +condicio.VALOR
+          }
+        );
+
+      } else {
+        const nextCodiResultArea = await connection.execute(
+          `SELECT NVL(MAX(ID), 0) + 1 AS NEXT_CODI FROM ecpu_area_activitat_condicio_TEST`,
+          {},
+          { outFormat: oracledb.OUT_FORMAT_OBJECT }
+        );
+
+        id = nextCodiResultArea.rows[0].NEXT_CODI;
+
+        await connection.execute(
+          `INSERT INTO ecpu_area_activitat_condicio_TEST 
+           (ID, AREA_ID, EPIGRAF_ID, CONDICIO_ID, VALOR) 
+           VALUES (:id, :area_id, :idEpigraf, :id_condicio, :valor)`,
+          {
+            id: id,
+            area_id: condicio.ID_ZONA,
+            idEpigraf: EPIGRAF_ID,
+            id_condicio: +condicio.CONDICIO_ID,
+            valor: condicio.VALOR == null ? condicio.VALOR : +condicio.VALOR
+          }
+        );
+      }
+    }
+
+    await connection.commit(); // Fa el commit només un cop al final
+
+    res.status(200).send('Epígraf creat correctament.');
+
+  } catch (error) {
+    console.error('❌ Error creant l\'epígraf:', error);
+    res.status(500).send('Error creant l\'epígraf.');
+  } finally {
+    if (connection) await connection.close();
+  }
+
+  function controlParametres(dades) {
+    let faltenDades = false;
+    let camp = "";
+    if (dades.codi1 == '' || dades.codi2 == '' || dades.codi3 == '') {
+      faltenDades = true;
+      camp = "codi";
+      return { faltenDades, camp };
+    }
+
+    if (dades.descripcio == '') {
+      faltenDades = true;
+      camp = "descripcio";
+      return { faltenDades, camp };
+    }
+
+    dades.CONDICIONS.forEach(condicio => {
+      if (condicio.CONDICIO_ID = null) {
+        faltenDades = true;
+        camp = "Condicio" + condicio.CODI;
+        return { faltenDades, camp };
+      }
+    });
+  }
+};
+
+const updateCondicio = async (req, res) => {
+  let connection;
+  try {
+    const { condicio } = req.body;
+
+    connection = await db();
+
+    if (condicio.IS_ZONA) {
+      const result = await connection.execute(
+        `UPDATE ecpu_zona_activitat_condicio_test SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
+        {
+          condicio_id: condicio.CONDICIO_ID,
+          valor: condicio.VALOR,
+          id: condicio.ID
+        },
+        { autoCommit: true }
+      );
+
+      if (result.rowsAffected === 0) {
+        return res.status(404).send('Condició no trobada.');
+      }
+
+      res.status(200).send('Condició actualitzada correctament.');
+    } else {
+      const result = await connection.execute(
+        `UPDATE ecpu_area_activitat_condicio_test SET CONDICIO_ID = :condicio_id, VALOR = :valor WHERE ID = :id`,
+        {
+          condicio_id: condicio.CONDICIO_ID,
+          valor: condicio.VALOR,
+          id: condicio.ID
+        },
+        { autoCommit: true }
+      );
+
+      if (result.rowsAffected === 0) {
+        return res.status(404).send('Condició no trobada.');
+      }
+
+      res.status(200).send('Condició actualitzada correctament.');
+    }
+  } catch (error) {
+    console.error('❌ Error actualitzant la condició:', error);
+    res.status(500).send('Error actualitzant la condició.');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
+const updateEpigraf = async (req, res) => {
+  let connection;
+  try {
+    const { epigraf } = req.body;
+
+    connection = await db();
+
+    const result = await connection.execute(
+      `UPDATE ecpu_epigraf SET DESCRIPCIO = :descripcio, MOSTRAR = :mostar WHERE ID = :id`,
+      {
+        descripcio: epigraf.descripcio,
+        mostar: epigraf.mostrar ? 1 : 0,
+        id: epigraf.id
+      },
+      { autoCommit: true }
+    );
+
+    if (result.rowsAffected === 0) {
+      return res.status(404).send('Epígraf no trobat.');
+    }
+
+    res.status(200).send('Epígraf actualitzat correctament.');
+  } catch (error) {
+    console.error('❌ Error actualitzant l\'epígraf:', error);
+    res.status(500).send('Error actualitzant l\'epígraf.');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
 
 module.exports = {
   processCondicionsUpload,
   processEpigrafUpload,
-  getEpigrafs
+  getEpigrafs,
+  getEpigraf,
+  createEpigraf,
+  updateCondicio,
+  updateEpigraf
 };
