@@ -9,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 //afegit guillem
-/*  const https = require('https');
+const https = require('https');
 const fs = require('fs');
 
 https.createServer({
@@ -18,7 +18,7 @@ https.createServer({
 },app.get("/", (req, res) => {
     res.writeHead(200);
     res.end('Hello from Node!\n');
-})).listen(3443);*/
+})).listen(3443);
 
 //fi afegit Gyuillem
 
