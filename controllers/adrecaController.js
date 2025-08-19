@@ -135,7 +135,8 @@ const getAdreces = async (req, res) => {
       CASE WHEN at.codi IS NOT NULL THEN 'ATE ' || z.codi || '.' || at.codi ELSE NULL END AS "codi_area"
     FROM ecpu_adreca a
     JOIN ecpu_zona z ON a.zona_id = z.id 
-    LEFT JOIN ecpu_area_tractament at ON a.area_tractament_id = at.id`,
+    LEFT JOIN ecpu_area_tractament at ON a.area_tractament_id = at.id
+    ORDER BY adreca`,
     [],
     { outFormat: oracledb.OUT_FORMAT_OBJECT }
   );
