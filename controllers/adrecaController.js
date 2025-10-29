@@ -128,7 +128,7 @@ const getAdreces = async (req, res) => {
     connection = await db();
    const result = await connection.execute(
     `SELECT a.DOMCOD, 
-      a.ADRECA AS "adreca",
+      TRIM(REGEXP_REPLACE(a.ADRECA, '[[:space:]]+', ' ')) AS "adreca",
       a.NUCLICOD AS "NUCLICOD", a.pis AS "pis", a.tipus_dom AS "tipus_dom", a.tipus_loc AS "tipus_loc", a.amplada_carrer AS "amplada_carrer", a.coord_x AS "coord_x", a.coord_y AS "coord_y", a.zona_id AS "zona_id", 
       'ZR-' || z.codi AS "codi_zona", 
       a.area_tractament_id AS "area_tractament_id", 
