@@ -37,6 +37,9 @@ router.post('/activitats/consulta', activitatController.consultaActivitat);
 // Protegir totes les rutes amb JWT middleware (a excepció de les rutes de login i registre)
 router.use(authMiddleware.verifyToken);
 
+//CONFIGURACIO
+router.put('/configuracio/link-pla-especial', configuracioController.updateLinkPlaEspecial);
+
 //ADRECES
 router.post('/uploadAdreces', upload.single('file'), adrecaController.uploadAdreces);
 router.put('/adreces/:domcod', upload.single('imatge'), adrecaController.actualitzarAdreca);

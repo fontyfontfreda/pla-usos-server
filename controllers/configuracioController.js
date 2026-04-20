@@ -33,6 +33,36 @@ const getLinkPlaEspecial = async (req, res) => {
   }
 };
 
+
+const updateLinkPlaEspecial = async (req, res) => {
+  let connection;
+  try {
+    const { link } = req.body;
+
+    connection = await db();
+    
+    const result = await connection.execute(
+        `UPDATE ecpu_configuracio SET LINK_PLA_ESPECIAL = :link`,
+        {
+          link: link
+        },
+        { autoCommit: true }
+      );
+
+      if (result.rowsAffected === 0) {
+        return res.status(404).send('Enllaç no actualitzat.');
+      }
+
+      res.status(200).send('Enllaç actualitzat correctament.');
+  } catch (error) {
+    console.error('❌ Error actualitzant l\'enllaç:', error);
+    res.status(500).send('Error actualitzant l\'enllaç.');
+  } finally {
+    if (connection) await connection.close();
+  }
+};
+
 module.exports = {
   getLinkPlaEspecial,
+  updateLinkPlaEspecial
 };
