@@ -7,6 +7,7 @@ const activitatController = require('../controllers/activitatController');
 const authController = require('../controllers/authController');
 const usuariController = require('../controllers/usuariController');
 const consultaController = require('../controllers/consultaController');
+const configuracioController = require('../controllers/configuracioController');
 const authMiddleware = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -18,6 +19,9 @@ router.get('/health', (req, res) => {res.send(200, { message: 'ok' });});
 // Ruta d'autenticació (no protegida)
 router.post('/login', authController.login);
 router.post('/register', authController.register);
+
+//CONFIGURACIO
+router.get('/configuracio/link-pla-especial', configuracioController.getLinkPlaEspecial);
 
 //ADRECES
 router.get('/adreces', adrecaController.getAdreces);
