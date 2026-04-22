@@ -29,7 +29,7 @@ const login = async (req, res) => {
       process.env.JWT_SECRET_KEY
     );
 
-    res.json({ token });
+    res.json({ token, rol: user.rol });
   } catch (error) {
     console.error('❌ Error al fer login:', error);
     res.status(500).json({ message: 'Error al processar la sol·licitud' });

@@ -11,7 +11,7 @@ const findUserByUsername = async (username) => {
   try {
     connection = await db();
     const result = await connection.execute(
-      `SELECT ID, USUARI AS "user", CONTRASENYA AS "password" FROM ECPU_USUARIS WHERE USUARI = :username`,
+      `SELECT ID, USUARI AS "user", CONTRASENYA AS "password", ROL AS "rol" FROM ECPU_USUARIS WHERE USUARI = :username`,
       [username],
       { outFormat: require('oracledb').OUT_FORMAT_OBJECT }
     );
