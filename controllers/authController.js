@@ -38,7 +38,7 @@ const login = async (req, res) => {
 
 // Funció per crear un nou usuari
 const register = async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, rol } = req.body;
 
   // Comprovar si l'usuari ja existeix
   const existingUser = await userModel.findUserByUsername(username);
@@ -47,7 +47,7 @@ const register = async (req, res) => {
   }
 
   // Crear un nou usuari
-  const newUser = await userModel.createUser(username, password);
+  const newUser = await userModel.createUser(username, password, rol);
 
   // Retornar l'usuari creat
   res.status(201).json({ message: 'Usuari creat amb èxit', user: newUser });

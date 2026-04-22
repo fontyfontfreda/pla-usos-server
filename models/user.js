@@ -28,9 +28,10 @@ const findUserByUsername = async (username) => {
  * Crea un nou usuari a la base de dades
  * @param {string} username
  * @param {string} password
+ * @param {number} rol
  * @returns {Promise<object>}
  */
-const createUser = async (username, password) => {
+const createUser = async (username, password, rol) => {
   let connection;
   try {
     connection = await db();
@@ -40,11 +41,12 @@ const createUser = async (username, password) => {
     const hashedPassword = bcrypt.hashSync(password, salt);
 
     const result = await connection.execute(
-      `INSERT INTO ECPU_USUARIS (USUARI, CONTRASENYA) VALUES (:username, :password) RETURNING ID INTO :id`,
+      `INSERT INTO ECPU_USUARIS (USUARI, CONTRASENYA, ROL) VALUES (:username, :password, :rol) RETURNING ID INTO :id`,
       {
         username,
         password: hashedPassword,
-        id: { dir: require('oracledb').BIND_OUT, type: require('oracledb').NUMBER }
+        id: { dir: require('oracledb').BIND_OUT, type: require('oracledb').NUMBER },
+        rol
       },
       { autoCommit: true }
     );

@@ -18,7 +18,6 @@ router.get('/health', (req, res) => {res.send(200, { message: 'ok' });});
 
 // Ruta d'autenticació (no protegida)
 router.post('/login', authController.login);
-router.post('/register', authController.register);
 
 //CONFIGURACIO
 router.get('/configuracio/link-pla-especial', configuracioController.getLinkPlaEspecial);
@@ -62,7 +61,13 @@ router.delete('/zones/area', zonaController.deleteArea);
 //USUARIS
 router.get('/usuaris', usuariController.getUsuaris);
 router.put('/usuaris/:usuari/contrasenya', usuariController.updateContrasenya);
+router.put('/usuaris/:usuari/rol', usuariController.updateRol);
 router.delete('/usuaris/:usuari', usuariController.deleteUsuari);
+
+router.post('/register', authController.register);
+
+//ROLS 
+router.get('/usuaris/rols', usuariController.getRols);
 
 //CONSULTES
 router.get('/consultes', consultaController.getConsultes);
