@@ -382,6 +382,9 @@ const getEpigraf = async (req, res) => {
 const createEpigraf = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     connection = await db();
 
     const { dades } = req.body;
@@ -506,6 +509,9 @@ const createEpigraf = async (req, res) => {
 const updateCondicio = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     const { condicio } = req.body;
 
     connection = await db();
@@ -554,6 +560,9 @@ const updateCondicio = async (req, res) => {
 const updateEpigraf = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     const { epigraf } = req.body;
 
     connection = await db();

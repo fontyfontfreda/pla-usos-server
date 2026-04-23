@@ -6,10 +6,13 @@ const bcrypt = require("bcryptjs");
 
 const getUsuaris = async (req, res) => {
   let connection;
-  try {
+  try {    
     connection = await db();
     const result = await connection.execute(
-      `SELECT USUARI AS "usuari", CONTRASENYA AS "contrasenya", ROL as "rol" FROM ECPU_USUARIS WHERE ID > 1`,
+      `SELECT USUARI AS "usuari", CONTRASENYA AS "contrasenya", ROL as "rol", DESCRIPCIO as "rol_descripcio" FROM 
+        ECPU_USUARIS u
+        JOIN ECPU_ROL r on r.codi = u.rol
+        WHERE ID > 1`,
       [],
       { outFormat: oracledb.OUT_FORMAT_OBJECT },
     );
@@ -57,6 +60,10 @@ const getRols = async (req, res) => {
 const updateContrasenya = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
+
     const { usuari } = req.params;
     const { novaContrasenya } = req.body;
 
@@ -93,6 +100,10 @@ const updateContrasenya = async (req, res) => {
 const updateRol = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
+
     const { usuari } = req.params;
     const { nouRol } = req.body;
 
@@ -131,6 +142,9 @@ const updateRol = async (req, res) => {
 const deleteUsuari = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     const { usuari } = req.params;
 
     connection = await db();

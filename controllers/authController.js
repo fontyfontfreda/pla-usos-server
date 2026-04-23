@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const userModel = require('../models/user'); // El model d'usuari
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const userModel = require("../models/user"); // El model d'usuari
 
 // Funció de login
 const login = async (req, res) => {
@@ -10,29 +10,38 @@ const login = async (req, res) => {
     const user = await userModel.findUserByUsername(username);
 
     if (!user) {
-      return res.status(401).json({ message: 'Usuari o contrasenya incorrectes' });
+      return res
+        .status(401)
+        .json({ message: "Usuari o contrasenya incorrectes" });
     }
 
     // Validació afegida: assegurem-nos que el password de la BBDD existeix
     if (!user.password) {
-      return res.status(500).json({ message: 'Error intern: no s\'ha trobat la contrasenya de l\'usuari' });
+      return res
+        .status(500)
+        .json({
+          message: "Error intern: no s'ha trobat la contrasenya de l'usuari",
+        });
     }
 
     const isPasswordValid = bcrypt.compareSync(password, user.password);
 
     if (!isPasswordValid) {
-      return res.status(401).json({ message: 'Usuari o contrasenya incorrectes' });
+      return res
+        .status(401)
+        .json({ message: "Usuari o contrasenya incorrectes" });
     }
 
     const token = jwt.sign(
-      { id: user.id, username: user.username },
-      process.env.JWT_SECRET_KEY
+      { id: user.ID, username: user.user, rol: user.rol },
+      process.env.JWT_SECRET_KEY,
+      { expiresIn: "8h" },
     );
 
     res.json({ token, rol: user.rol });
   } catch (error) {
-    console.error('❌ Error al fer login:', error);
-    res.status(500).json({ message: 'Error al processar la sol·licitud' });
+    console.error("❌ Error al fer login:", error);
+    res.status(500).json({ message: "Error al processar la sol·licitud" });
   }
 };
 
@@ -40,19 +49,25 @@ const login = async (req, res) => {
 const register = async (req, res) => {
   const { username, password, rol } = req.body;
 
+  if (req.user.rol > 2) {
+    return res
+      .status(401)
+      .json({
+        message: "No disposa de permisos per realitzar aquesta operació.",
+      });
+  }
+
   // Comprovar si l'usuari ja existeix
   const existingUser = await userModel.findUserByUsername(username);
   if (existingUser) {
-    return res.status(400).send('L\'usuari ja existeix');
+    return res.status(400).send("L'usuari ja existeix");
   }
 
   // Crear un nou usuari
   const newUser = await userModel.createUser(username, password, rol);
 
   // Retornar l'usuari creat
-  res.status(201).json({ message: 'Usuari creat amb èxit', user: newUser });
+  res.status(201).json({ message: "Usuari creat amb èxit", user: newUser });
 };
-
-
 
 module.exports = { login, register };

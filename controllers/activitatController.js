@@ -804,6 +804,9 @@ const getArees = async (req, res) => {
 const updateActivitat = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     const { activitat } = req.body;
 
     connection = await db();
@@ -870,6 +873,9 @@ const updateActivitat = async (req, res) => {
 const createGrup = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     const { grup } = req.body;
 
     connection = await db();
@@ -907,6 +913,9 @@ const createGrup = async (req, res) => {
 const createSubgrup = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     const { grup, subgrup } = req.body;
 
     if (!grup) {
@@ -959,6 +968,9 @@ const createSubgrup = async (req, res) => {
 const createActivitat = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     const { activitat } = req.body;
 
     if (!activitat.grup) {

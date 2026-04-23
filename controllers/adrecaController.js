@@ -171,6 +171,9 @@ const getAdreces = async (req, res) => {
 const actualitzarAdreca = async (req, res) => {
   let connection;
   try {
+    if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     connection = await db();
 
     const domcod = req.body.adreca.DOMCOD;

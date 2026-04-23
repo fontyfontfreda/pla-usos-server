@@ -37,6 +37,9 @@ const getLinkPlaEspecial = async (req, res) => {
 const updateLinkPlaEspecial = async (req, res) => {
   let connection;
   try {
+     if (req.user.rol > 2) {
+      return res.status(401).json({ message: 'No disposa de permisos per realitzar aquesta operació.'});
+    }
     const { link } = req.body;
 
     connection = await db();
