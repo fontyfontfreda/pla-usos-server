@@ -12,7 +12,7 @@ const verifyToken = (req, res, next) => {
     req.user = decoded; // Afegim la informació decodificada a la sol·licitud
     next(); // Continuar amb la petició
   } catch (error) {
-    res.status(401).send('Token invàlid o caducat');
+    res.status(470).send('Token invàlid o caducat');
   }
 };
 
